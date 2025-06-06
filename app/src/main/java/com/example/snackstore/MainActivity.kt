@@ -1,0 +1,808 @@
+package com.example.snackstore
+
+import android.os.Bundle
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.delay
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.ui.platform.LocalContext
+
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            AppNavigation()
+        }
+    }
+}
+
+@Composable
+fun AppNavigation() {
+    val navController = rememberNavController()
+
+    NavHost(navController, startDestination = "login") {
+        composable("login") { LoginScreen(navController) }
+        composable("main") { MainScreen(navController) }
+        composable("register") { RegisterScreen(navController) }
+        composable("profile") { ProfileScreen(navController) }
+        composable("edit_profile") { EditProfileScreen(navController) }
+        composable("cart") { CartScreen(navController) }
+    }
+}
+
+@Composable
+fun LoginScreen(navController: NavHostController) {
+    var login by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    val backgroundColor = Color(0xFFD6A153)
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = backgroundColor
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Логотип",
+                modifier = Modifier
+                    .size(160.dp)
+                    .padding(bottom = 32.dp)
+            )
+
+            TextField(
+                value = login,
+                onValueChange = { login = it },
+                label = { Text("Логин", color = Color.White) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    unfocusedIndicatorColor = Color.White,
+                    focusedIndicatorColor = Color.White,
+                    cursorColor = Color.White
+                )
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            TextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Пароль", color = Color.White) },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    unfocusedIndicatorColor = Color.White,
+                    focusedIndicatorColor = Color.White,
+                    cursorColor = Color.White
+                )
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    if (login == "1" && password == "1") {
+                        navController.navigate("main")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+            ) {
+                Text("Войти", color = backgroundColor)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedButton(
+                onClick = {
+                    navController.navigate("register")
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+            ) {
+                Text("Регистрация")
+            }
+        }
+    }
+}
+
+@Composable
+fun RegisterScreen(navController: NavHostController) {
+    var fullName by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var birthDate by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    val backgroundColor = Color(0xFFD6A153)
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = backgroundColor
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Логотип",
+                modifier = Modifier
+                    .size(160.dp)
+                    .padding(bottom = 32.dp)
+            )
+
+            RegistrationTextField(value = fullName, onValueChange = { fullName = it }, label = "ФИО")
+            RegistrationTextField(value = phone, onValueChange = { phone = it }, label = "Телефон")
+            RegistrationTextField(value = email, onValueChange = { email = it }, label = "Почта")
+            RegistrationTextField(value = birthDate, onValueChange = { birthDate = it }, label = "Дата рождения")
+            RegistrationTextField(value = password, onValueChange = { password = it }, label = "Пароль", isPassword = true)
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    // TODO: логика регистрации
+                    navController.navigate("login") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White)
+            ) {
+                Text("Зарегистрироваться", color = backgroundColor)
+            }
+        }
+    }
+}
+
+
+@Composable
+fun RegistrationTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    isPassword: Boolean = false,
+    textColor: Color = Color.White
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, color = textColor) },
+        visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            focusedTextColor = textColor,
+            unfocusedTextColor = textColor,
+            unfocusedIndicatorColor = textColor,
+            focusedIndicatorColor = textColor,
+            cursorColor = textColor
+        )
+    )
+}
+
+
+@Composable
+fun MainScreen(navController: NavHostController) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopBar(navController)
+
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier
+                .fillMaxSize(),
+            contentPadding = PaddingValues(8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header - баннер на всю ширину (2 колонки)
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                BannerSlider(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                )
+            }
+
+
+            items(20) { index ->
+                ProductCard(
+                    product = Product(
+                        name = "Товар $index",
+                        price = "0000 руб",
+                        imageRes = R.drawable.fool
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun BannerSlider(modifier: Modifier = Modifier) {
+    val images = listOf(
+        R.drawable.banner1,
+        R.drawable.banner2,
+        R.drawable.banner3
+    )
+
+    var currentPage by remember { mutableStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(3000L)
+            currentPage = (currentPage + 1) % images.size
+        }
+    }
+
+    Image(
+        painter = painterResource(id = images[currentPage]),
+        contentDescription = null,
+        modifier = modifier,
+        contentScale = ContentScale.Crop
+    )
+}
+
+@Composable
+fun TopBar(navController: NavHostController) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFD6A153))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(imageVector = Icons.Filled.Menu, contentDescription = null, tint = Color.White)
+        Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = Color.White)
+        Icon(
+            imageVector = Icons.Default.ShoppingCart,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.clickable {
+                navController.navigate("cart")
+            }
+        )
+        Icon(
+            imageVector = Icons.Default.AccountCircle,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.clickable {
+                navController.navigate("profile")
+            }
+        )
+    }
+}
+
+@Composable
+fun ProductGrid(modifier: Modifier = Modifier) {
+    val products = remember {
+        List(20) { index ->
+            Product(
+                name = "Товар $index",
+                price = "0000 руб",
+                imageRes = R.drawable.fool
+            )
+        }
+    }
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = modifier.padding(8.dp),
+        contentPadding = PaddingValues(bottom = 80.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(products) { product ->
+            ProductCard(product)
+        }
+    }
+}
+
+data class Product(val name: String, val price: String, val imageRes: Int)
+
+@Composable
+fun ProductCard(product: Product, onAddToCart: (Product) -> Unit = {}) {
+    var isLiked by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .width(180.dp)
+            .padding(8.dp)
+            .background(Color.LightGray, shape = RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, Color.Gray.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp)
+        ) {
+            Image(
+                painter = painterResource(id = product.imageRes),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            Icon(
+                imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                contentDescription = if (isLiked) "Liked" else "Not liked",
+                tint = if (isLiked) Color.Red else Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(24.dp)
+                    .clickable { isLiked = !isLiked }
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(product.name, style = MaterialTheme.typography.bodyMedium)
+            Text(product.price, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = { onAddToCart(product) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Добавить в корзину")
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+fun ProfileScreen(navController: NavHostController) {
+    var selectedTab by remember { mutableStateOf(0) }
+    val tabs = listOf("Избранное", "Заказы")
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .background(Color(0xFFD6A153))
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            IconButton(
+                onClick = { navController.popBackStack() },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Назад",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = "Avatar",
+                    modifier = Modifier.size(90.dp),
+                    tint = Color.White
+                )
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Имя", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("00.00.0000", color = Color.White, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("+70000000000", color = Color.White, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("email@email.ru", color = Color.White, fontSize = 14.sp)
+                }
+
+                IconButton(
+                    onClick = {
+                        navController.navigate("edit_profile")
+                    },
+                    modifier = Modifier.align(Alignment.Top)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Редактировать",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            tabs.forEachIndexed { index, title ->
+                Column(
+                    modifier = Modifier
+                        .clickable { selectedTab = index }
+                        .padding(horizontal = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = title,
+                            color = if (selectedTab == index) Color(0xFFD6A153) else Color.Gray,
+                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = if (title == "Избранное") Icons.Default.FavoriteBorder else Icons.Default.ShoppingCart,
+                            contentDescription = null,
+                            tint = if (selectedTab == index) Color(0xFFD6A153) else Color.Gray
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    if (selectedTab == index) {
+                        Box(
+                            modifier = Modifier
+                                .height(2.dp)
+                                .width(40.dp)
+                                .background(Color(0xFFD6A153))
+                        )
+                    }
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            when (selectedTab) {
+                0 -> FavoriteList()
+                1 -> OrdersList()
+            }
+        }
+    }
+}
+
+@Composable
+fun EditProfileScreen(navController: NavHostController) {
+    var fullName by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var birthDate by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+
+    val backgroundColor = Color.White
+    val textColor = Color(0xFFD6A153)
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = backgroundColor
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Изменение профиля",
+                color = textColor,
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "Логотип",
+                modifier = Modifier
+                    .size(160.dp)
+                    .padding(bottom = 32.dp)
+            )
+
+            RegistrationTextField(value = fullName, onValueChange = { fullName = it }, label = "ФИО", textColor = textColor)
+            RegistrationTextField(value = phone, onValueChange = { phone = it }, label = "Телефон", textColor = textColor)
+            RegistrationTextField(value = email, onValueChange = { email = it }, label = "Почта", textColor = textColor)
+            RegistrationTextField(value = birthDate, onValueChange = { birthDate = it }, label = "Дата рождения", textColor = textColor)
+            RegistrationTextField(value = password, onValueChange = { password = it }, label = "Пароль", isPassword = true, textColor = textColor)
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    // TODO: логика сохранения
+                    navController.popBackStack()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = textColor)
+            ) {
+                Text("Сохранить", color = Color.White)
+            }
+        }
+    }
+}
+
+
+
+@Composable
+fun FavoriteList() {
+    Box(modifier = Modifier.fillMaxSize()) {
+        ProductGrid()
+    }
+}
+
+@Composable
+fun OrdersList() {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items(5) { index ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFD6A153) // Устанавливаем нужный фон
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Дата заказа: 0${index + 1}.06.2025",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "Сумма: ${(index + 1) * 1000} ₽",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(3) { imgIndex ->
+                            Box(
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.LightGray),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = "Фото ${imgIndex + 1}")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+fun CartScreen(navController: NavHostController) {
+
+    val context = LocalContext.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .background(Color(0xFFD6A153))
+                .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Назад",
+                tint = Color.White,
+                modifier = Modifier
+                    .padding(start = 16.dp)
+                    .align(Alignment.CenterStart)
+                    .clickable { navController.popBackStack() }
+            )
+        }
+
+        // Значок корзины под панелью
+        Icon(
+            imageVector = Icons.Default.ShoppingCart,
+            contentDescription = "Корзина",
+            tint = Color(0xFFD6A153),
+            modifier = Modifier
+                .size(80.dp)
+                .align(Alignment.CenterHorizontally)
+                .padding(top = 16.dp)
+        )
+
+        // Большое бежевое поле с содержимым заказа
+        Box(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
+                .background(Color(0xFFF5F1E6), shape = RoundedCornerShape(16.dp))
+                .padding(16.dp)
+        ) {
+            Column {
+                // Верхний ряд с датой и суммой
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "00.00.00",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Black
+                    )
+                    Text(
+                        text = "00000 руб",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Black
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Поле адреса (просто TextField)
+                OutlinedTextField(
+                    value = "",
+                    onValueChange = {},
+                    placeholder = { Text("Поле адреса") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        focusedIndicatorColor = Color(0xFFD6A153),
+                        unfocusedIndicatorColor = Color.Gray
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Элементы заказа - вода и снек
+                OrderItem(name = "вода", price = "000 руб")
+                Spacer(modifier = Modifier.height(8.dp))
+                OrderItem(name = "снек", price = "000 руб")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = {
+                Toast.makeText(
+                    context,
+                    "Ваш заказ успешно оформлен",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                navController.navigate("main") {
+                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD6A153))  // Исправлено имя параметра
+        ) {
+            Text(text = "Подтвердить заказ", color = Color.White)
+        }
+    }
+}
+
+
+@Composable
+fun OrderItem(name: String, price: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White, shape = RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color.White, shape = RoundedCornerShape(8.dp))
+                    .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
+            ) {
+                // Тут можно вставить иконку или изображение, пока просто пусто
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text = name, style = MaterialTheme.typography.bodyMedium)
+        }
+
+        Text(text = price, style = MaterialTheme.typography.bodyMedium, color = Color.Black)
+    }
+}
