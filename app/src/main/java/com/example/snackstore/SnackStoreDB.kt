@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.example.snackstore.DAO.CartDao
 import com.example.snackstore.DAO.ClientsDao
 import com.example.snackstore.DAO.DeliveryDriverDao
 import com.example.snackstore.DAO.FavoriteGoodsDao
@@ -11,6 +12,7 @@ import com.example.snackstore.DAO.GoodsDao
 import com.example.snackstore.DAO.GoodsTagsDao
 import com.example.snackstore.DAO.OrderedGoodsDao
 import com.example.snackstore.DAO.OrdersDao
+import com.example.snackstore.entity.CartItem
 import com.example.snackstore.entity.Client
 import com.example.snackstore.entity.DeliveryDriver
 import com.example.snackstore.entity.FavoriteGoods
@@ -27,7 +29,8 @@ import com.example.snackstore.entity.OrderedGoods
         Order::class,
         OrderedGoods::class,
         DeliveryDriver::class,
-        GoodsTags::class
+        GoodsTags::class,
+        CartItem::class
     ],
     version = 1,
     exportSchema = false
@@ -41,6 +44,7 @@ abstract class SnackStoreDatabase : RoomDatabase() {
     abstract fun orderedGoodsDao(): OrderedGoodsDao
     abstract fun deliveryDriverDao(): DeliveryDriverDao
     abstract fun goodsTagsDao(): GoodsTagsDao
+    abstract fun cartDao(): CartDao
 
     companion object {
         @Volatile
@@ -52,7 +56,8 @@ abstract class SnackStoreDatabase : RoomDatabase() {
                     context.applicationContext,
                     SnackStoreDatabase::class.java,
                     "snack_store_database"
-                ).build()
+                )
+                    .build()
                 INSTANCE = instance
                 instance
             }

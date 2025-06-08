@@ -1,10 +1,10 @@
 package com.example.snackstore
 
+import android.app.Application
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,15 +16,11 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +41,19 @@ import kotlinx.coroutines.delay
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.snackstore.ViewModels.ClientViewModel
+import com.example.snackstore.ViewModels.ClientViewModelFactory
+import com.example.snackstore.entity.Client
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import android.app.DatePickerDialog
+
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+
 
 
 class MainActivity : ComponentActivity() {
@@ -74,8 +83,24 @@ fun AppNavigation() {
 fun LoginScreen(navController: NavHostController) {
     var login by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val viewModel: ClientViewModel = viewModel(
+        factory = ClientViewModelFactory(context.applicationContext as Application)
+    )
+    val authResult = viewModel.authResult
+
 
     val backgroundColor = Color(0xFFD6A153)
+
+
+    LaunchedEffect(authResult) {
+        if (authResult != null) {
+            navController.navigate("main") {
+                popUpTo("login") { inclusive = true }
+            }
+            viewModel.resetState()
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -136,9 +161,7 @@ fun LoginScreen(navController: NavHostController) {
 
             Button(
                 onClick = {
-                    if (login == "1" && password == "1") {
-                        navController.navigate("main")
-                    }
+                    viewModel.login(email = login, password = password)
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White)
@@ -169,7 +192,47 @@ fun RegisterScreen(navController: NavHostController) {
     var birthDate by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
+    val context = LocalContext.current
+    val viewModel: ClientViewModel = viewModel(
+        factory = ClientViewModelFactory(context.applicationContext as Application)
+    )
+    val registrationSuccess = viewModel.registrationSuccess
+
     val backgroundColor = Color(0xFFD6A153)
+
+    val calendar = remember { Calendar.getInstance() }
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
+
+    // Управление показом диалога
+    var showDatePickerDialog by remember { mutableStateOf(false) }
+
+    // Показать диалог, если флаг выставлен
+    if (showDatePickerDialog) {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                calendar.set(year, month, dayOfMonth)
+                birthDate = dateFormat.format(calendar.time)
+                showDatePickerDialog = false
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply {
+            setOnCancelListener {
+                showDatePickerDialog = false
+            }
+        }.show()
+    }
+
+    LaunchedEffect(registrationSuccess) {
+        if (registrationSuccess) {
+            navController.navigate("login") {
+                popUpTo("login") { inclusive = true }
+            }
+            viewModel.resetState()
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -193,17 +256,47 @@ fun RegisterScreen(navController: NavHostController) {
             RegistrationTextField(value = fullName, onValueChange = { fullName = it }, label = "ФИО")
             RegistrationTextField(value = phone, onValueChange = { phone = it }, label = "Телефон")
             RegistrationTextField(value = email, onValueChange = { email = it }, label = "Почта")
-            RegistrationTextField(value = birthDate, onValueChange = { birthDate = it }, label = "Дата рождения")
-            RegistrationTextField(value = password, onValueChange = { password = it }, label = "Пароль", isPassword = true)
+
+            // Обертка OutlinedTextField в Box с .clickable
+            Box(modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp)
+                .clickable {
+                    showDatePickerDialog = true
+                }
+            ) {
+                OutlinedTextField(
+                    value = birthDate,
+                    onValueChange = {},
+                    label = { Text("Дата рождения") },
+                    readOnly = true,
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            RegistrationTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = "Пароль",
+                isPassword = true
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = {
-                    // TODO: логика регистрации
-                    navController.navigate("login") {
-                        popUpTo("login") { inclusive = true }
-                    }
+                    val parts = fullName.split(" ")
+                    val client = Client(
+                        first_name = parts.getOrNull(1),
+                        second_name = parts.getOrNull(0),
+                        third_name = parts.getOrNull(2),
+                        birth_day = birthDate,
+                        phone_number = phone,
+                        email = email,
+                        password = password
+                    )
+                    viewModel.register(client)
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White)
@@ -213,7 +306,6 @@ fun RegisterScreen(navController: NavHostController) {
         }
     }
 }
-
 
 @Composable
 fun RegistrationTextField(
