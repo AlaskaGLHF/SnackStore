@@ -57,10 +57,13 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.example.snackstore.ViewModels.CartViewModel
 import com.example.snackstore.ViewModels.EditProfileViewModel
 import com.example.snackstore.ViewModels.GoodsViewModel
 import com.example.snackstore.ViewModels.GoodsViewModelFactory
 import com.example.snackstore.entity.Goods
+import kotlinx.coroutines.launch
+import java.util.Date
 
 
 class MainActivity : ComponentActivity() {
@@ -131,7 +134,7 @@ fun LoginScreen(navController: NavHostController) {
             TextField(
                 value = login,
                 onValueChange = { login = it },
-                label = { Text("Логин", color = Color.White) },
+                label = { Text("Email", color = Color.White) },
                 modifier = Modifier.fillMaxWidth(),
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -193,7 +196,6 @@ fun LoginScreen(navController: NavHostController) {
         }
     }
 }
-
 
 @Composable
 fun RegisterScreen(navController: NavHostController) {
@@ -472,8 +474,6 @@ fun ProductGrid(
     }
 }
 
-
-
 @Composable
 fun ProductCard(
     good: Goods,
@@ -539,7 +539,10 @@ fun ProductCard(
             Button(
                 onClick = { onAddToCart(good) },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFD6A153)
+                )
             ) {
                 Text("В корзину")
             }
@@ -548,8 +551,6 @@ fun ProductCard(
         }
     }
 }
-
-
 
 @SuppressLint("DiscouragedApi")
 @Composable
@@ -691,8 +692,6 @@ fun ProfileScreen(
     }
 }
 
-
-
 @Composable
 fun EditProfileScreen(
     navController: NavHostController,
@@ -713,18 +712,23 @@ fun EditProfileScreen(
 
     val client by editProfileViewModel.client.collectAsState()
 
+    LaunchedEffect(Unit) {
+        delay(100)
+        Log.d("EditProfileScreen", "Пробуем прочитать client после задержки: ${client}")
+    }
+
     var fullName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var birthDate by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    // Для DatePicker
     val calendar = remember { Calendar.getInstance() }
     val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(client) {
+
         client?.let {
             fullName = it.first_name ?: ""
             phone = it.phone_number ?: ""
@@ -783,7 +787,6 @@ fun EditProfileScreen(
             RegistrationTextField(value = phone, onValueChange = { phone = it }, label = "Телефон", textColor = textColor)
             RegistrationTextField(value = email, onValueChange = { email = it }, label = "Почта", textColor = textColor)
 
-            // Поле с выбором даты — показываем DatePicker по клику
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -812,22 +815,29 @@ fun EditProfileScreen(
 
             Button(
                 onClick = {
-                    if (client != null) {
-                        val updatedClient = client!!.copy(
-                            first_name = fullName,
-                            phone_number = phone,
-                            email = email,
-                            birth_day = birthDate,
-                            password = password
-                        )
-                        Log.d("EditProfileScreen", "Обновляем профиль: $updatedClient")
-                        editProfileViewModel.updateClient(updatedClient)
+                    Log.d("EditProfileScreen", "Кнопка нажата, client: $client")
 
-                        // Обновляем данные клиента в общем ClientViewModel
-                        clientViewModel.loadClient(updatedClient.id.toLong())
-
-                        navController.popBackStack()
+                    val currentClient = client ?: run {
+                        Log.w("EditProfileScreen", "client is null!")
+                        return@Button
                     }
+
+                    val updatedClient = currentClient.copy(
+                        first_name = fullName,
+                        phone_number = phone,
+                        email = email,
+                        birth_day = birthDate,
+                        password = password
+                    )
+
+                    Log.d("EditProfileScreen", "Обновляем профиль: $updatedClient")
+
+                    editProfileViewModel.updateClient(updatedClient)
+
+                    clientViewModel.loadClient(updatedClient.id.toLong())
+                    Log.d("EditProfileScreen", "loadClient вызван с id: ${updatedClient.id}")
+
+                    navController.popBackStack()
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = textColor)
@@ -850,7 +860,6 @@ fun FavoriteList(goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewM
         }
     }
 }
-
 
 @Composable
 fun OrdersList() {
@@ -899,17 +908,32 @@ fun OrdersList() {
     }
 }
 
-
 @Composable
-fun CartScreen(navController: NavHostController) {
-
+fun CartScreen(
+    navController: NavHostController,
+    cartViewModel: CartViewModel = viewModel()
+) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val cartItems by cartViewModel
+        .cartDao
+        .getDetailedCartItems(cartViewModel.clientId)
+        .collectAsState(initial = emptyList())
+
+    var address by remember { mutableStateOf("") }
+    val date = SimpleDateFormat("dd.MM.yy", Locale.getDefault()).format(Date())
+
+    val totalPrice = cartItems.sumOf {
+        val price = it.price?.toIntOrNull() ?: 0
+        price * it.item.quantity
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
     ) {
+        // Top bar
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -928,7 +952,7 @@ fun CartScreen(navController: NavHostController) {
             )
         }
 
-        // Значок корзины под панелью
+        // Icon
         Icon(
             imageVector = Icons.Default.ShoppingCart,
             contentDescription = "Корзина",
@@ -939,7 +963,7 @@ fun CartScreen(navController: NavHostController) {
                 .padding(top = 16.dp)
         )
 
-        // Большое бежевое поле с содержимым заказа
+        // Cart content box
         Box(
             modifier = Modifier
                 .padding(16.dp)
@@ -948,29 +972,21 @@ fun CartScreen(navController: NavHostController) {
                 .padding(16.dp)
         ) {
             Column {
-                // Верхний ряд с датой и суммой
+                // Date and total price
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "00.00.00",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Black
-                    )
-                    Text(
-                        text = "00000 руб",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Black
-                    )
+                    Text(text = date, style = MaterialTheme.typography.bodyMedium)
+                    Text(text = "$totalPrice руб", style = MaterialTheme.typography.bodyMedium)
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Поле адреса (просто TextField)
+                // Address field
                 OutlinedTextField(
-                    value = "",
-                    onValueChange = {},
+                    value = address,
+                    onValueChange = { address = it },
                     placeholder = { Text("Поле адреса") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = TextFieldDefaults.colors(
@@ -983,38 +999,41 @@ fun CartScreen(navController: NavHostController) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Элементы заказа - вода и снек
-                OrderItem(name = "вода", price = "000 руб")
-                Spacer(modifier = Modifier.height(8.dp))
-                OrderItem(name = "снек", price = "000 руб")
+                // Cart items
+                cartItems.forEach {
+                    OrderItem(
+                        name = it.name ?: "Товар",
+                        price = "${it.price} руб x${it.item.quantity}"
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Spacer(modifier = Modifier.height(24.dp))
-
+        // Confirm button
         Button(
             onClick = {
-                Toast.makeText(
-                    context,
-                    "Ваш заказ успешно оформлен",
-                    Toast.LENGTH_SHORT
-                ).show()
-
-                navController.navigate("main") {
-                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                scope.launch {
+                    cartViewModel.confirmOrder()  // БД-операция
+                    Toast.makeText(context, "Ваш заказ успешно оформлен", Toast.LENGTH_SHORT).show()
+                    navController.navigate("main") {
+                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                    }
                 }
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD6A153))  // Исправлено имя параметра
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD6A153))
         ) {
             Text(text = "Подтвердить заказ", color = Color.White)
         }
     }
 }
+
+
 
 
 @Composable
@@ -1034,7 +1053,6 @@ fun OrderItem(name: String, price: String) {
                     .background(Color.White, shape = RoundedCornerShape(8.dp))
                     .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
             ) {
-                // Тут можно вставить иконку или изображение, пока просто пусто
             }
             Spacer(modifier = Modifier.width(8.dp))
             Text(text = name, style = MaterialTheme.typography.bodyMedium)

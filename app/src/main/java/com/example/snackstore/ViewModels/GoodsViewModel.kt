@@ -3,9 +3,6 @@ package com.example.snackstore.ViewModels
 import android.app.Application
 import android.content.Context
 import android.util.Log
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -40,16 +37,16 @@ class GoodsViewModel(application: Application) : AndroidViewModel(application) {
         }
 
     fun toggleFavorite(good: Goods) {
-        if (clientId == -1 || good.id == null) return
+        if (clientId == -1) return
 
         viewModelScope.launch {
             val existing = favoriteDao.getFavoriteByClientAndGoods(clientId, good.id)
             if (existing != null) {
                 favoriteDao.deleteByClientAndGoods(clientId, good.id)
-                Log.d("SnackStore", "Удалено из избранного: ${good.name}")
+                Log.d("Prepopulate", "Удалено из избранного: ${good.name}")
             } else {
                 favoriteDao.insert(FavoriteGoods(0, clientId, good.id))
-                Log.d("SnackStore", "Добавлено в избранное: ${good.name}")
+                Log.d("Prepopulate", "Добавлено в избранное: ${good.name}")
             }
         }
     }

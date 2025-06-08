@@ -11,6 +11,7 @@ import androidx.room.PrimaryKey
         ForeignKey(entity = DeliveryDriver::class, parentColumns = ["id"], childColumns = ["delivery_driver_id"], onDelete = ForeignKey.SET_NULL)
     ]
 )
+
 data class Order(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val client_id: Int,

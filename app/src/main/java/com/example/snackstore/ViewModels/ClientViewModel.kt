@@ -15,6 +15,7 @@ import com.example.snackstore.entity.Client
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import androidx.core.content.edit
 
 class ClientViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -31,7 +32,9 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
 
     fun login(email: String, password: String) {
         viewModelScope.launch {
+            Log.d("Prepopulate", "Ищем клиента с email=$email и password=$password")
             val client = dao.getClientByEmailAndPassword(email, password)
+            Log.d("Prepopulate", "Результат авторизации: $client")
             authResult = client
             client?.let {
                 saveClientIdToPrefs(it.id.toLong())
@@ -39,13 +42,11 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-
     private fun saveClientIdToPrefs(clientId: Long) {
         val sharedPrefs = getApplication<Application>().getSharedPreferences("SnackStorePrefs", Context.MODE_PRIVATE)
-        sharedPrefs.edit().putLong("client_id", clientId).apply()
-        Log.d("SnackStore", "Client ID сохранён: $clientId")
+        sharedPrefs.edit { putLong("client_id", clientId) }
+        Log.d("Prepopulate", "Client ID сохранён: $clientId")
     }
-
 
     fun register(client: Client) {
         viewModelScope.launch {
@@ -62,6 +63,7 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
     fun getClientById(clientId: Long) = dao.getClientById(clientId)
 
     fun loadClient(clientId: Long) {
+        Log.d("Prepopulate", "Загружаем клиента с id: $clientId")
         viewModelScope.launch {
             dao.getClientById(clientId).collect { clientData ->
                 _client.value = clientData

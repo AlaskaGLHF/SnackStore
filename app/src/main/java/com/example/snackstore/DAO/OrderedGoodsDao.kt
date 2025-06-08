@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.example.snackstore.entity.OrderedGoods
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface OrderedGoodsDao {
@@ -17,4 +18,11 @@ interface OrderedGoodsDao {
 
     @Delete
     suspend fun delete(orderedGoods: OrderedGoods)
+
+    @Query("SELECT * FROM ordered_goods WHERE order_id = :orderId")
+    fun getGoodsForOrder(orderId: Int): Flow<List<OrderedGoods>>
+
+    @Query("SELECT DISTINCT order_id FROM ordered_goods WHERE good_id IN (SELECT good_id FROM ordered_goods)")
+    fun getAllOrders(): Flow<List<Int>>
+
 }

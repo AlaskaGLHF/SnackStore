@@ -28,4 +28,7 @@ interface GoodsDao {
         WHERE Favorite_Goods.client_id = :clientId
     """)
     fun getFavoriteGoodsWithInfo(clientId: Int): Flow<List<Goods>>
+
+    @Query("SELECT * FROM Goods WHERE id = :id")
+    suspend fun getGoodById(id: Int): Goods?
 }
