@@ -1,10 +1,10 @@
 package com.example.snackstore
 
+import android.app.Application
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,15 +16,11 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +41,22 @@ import kotlinx.coroutines.delay
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.snackstore.ViewModels.ClientViewModel
+import com.example.snackstore.ViewModels.ClientViewModelFactory
+import com.example.snackstore.entity.Client
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import android.app.DatePickerDialog
+import android.util.Log
+
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+import com.example.snackstore.ViewModels.GoodsViewModel
+import com.example.snackstore.ViewModels.GoodsViewModelFactory
+import com.example.snackstore.entity.Goods
 
 
 class MainActivity : ComponentActivity() {
@@ -75,7 +87,23 @@ fun LoginScreen(navController: NavHostController) {
     var login by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
+    val context = LocalContext.current
+    val viewModel: ClientViewModel = viewModel(
+        factory = ClientViewModelFactory(context.applicationContext as Application)
+    )
+    val authResult = viewModel.authResult
+
     val backgroundColor = Color(0xFFD6A153)
+
+    LaunchedEffect(authResult) {
+        if (authResult != null) {
+            Log.d("SnackStore", "Успешная авторизация пользователя: $login")
+            navController.navigate("main") {
+                popUpTo("login") { inclusive = true }
+            }
+            viewModel.resetState()
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -88,7 +116,6 @@ fun LoginScreen(navController: NavHostController) {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
             Image(
                 painter = painterResource(id = R.drawable.logo),
                 contentDescription = "Логотип",
@@ -136,8 +163,12 @@ fun LoginScreen(navController: NavHostController) {
 
             Button(
                 onClick = {
-                    if (login == "1" && password == "1") {
-                        navController.navigate("main")
+                    if (login.isBlank() || password.isBlank()) {
+                        Toast.makeText(context, "Заполните все поля", Toast.LENGTH_SHORT).show()
+                        Log.w("SnackStore", "Попытка входа с пустыми полями")
+                    } else {
+                        Log.d("SnackStore", "Попытка входа: $login")
+                        viewModel.login(email = login, password = password)
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -149,9 +180,7 @@ fun LoginScreen(navController: NavHostController) {
             Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedButton(
-                onClick = {
-                    navController.navigate("register")
-                },
+                onClick = { navController.navigate("register") },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
             ) {
@@ -161,6 +190,7 @@ fun LoginScreen(navController: NavHostController) {
     }
 }
 
+
 @Composable
 fun RegisterScreen(navController: NavHostController) {
     var fullName by remember { mutableStateOf("") }
@@ -169,7 +199,44 @@ fun RegisterScreen(navController: NavHostController) {
     var birthDate by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
+    val context = LocalContext.current
+    val viewModel: ClientViewModel = viewModel(
+        factory = ClientViewModelFactory(context.applicationContext as Application)
+    )
+    val registrationSuccess = viewModel.registrationSuccess
+
     val backgroundColor = Color(0xFFD6A153)
+
+    val calendar = remember { Calendar.getInstance() }
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
+
+    var showDatePickerDialog by remember { mutableStateOf(false) }
+
+    if (showDatePickerDialog) {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                calendar.set(year, month, dayOfMonth)
+                birthDate = dateFormat.format(calendar.time)
+                showDatePickerDialog = false
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply {
+            setOnCancelListener { showDatePickerDialog = false }
+        }.show()
+    }
+
+    LaunchedEffect(registrationSuccess) {
+        if (registrationSuccess) {
+            Log.d("SnackStore", "Успешная регистрация: $email")
+            navController.navigate("login") {
+                popUpTo("login") { inclusive = true }
+            }
+            viewModel.resetState()
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -193,17 +260,52 @@ fun RegisterScreen(navController: NavHostController) {
             RegistrationTextField(value = fullName, onValueChange = { fullName = it }, label = "ФИО")
             RegistrationTextField(value = phone, onValueChange = { phone = it }, label = "Телефон")
             RegistrationTextField(value = email, onValueChange = { email = it }, label = "Почта")
-            RegistrationTextField(value = birthDate, onValueChange = { birthDate = it }, label = "Дата рождения")
-            RegistrationTextField(value = password, onValueChange = { password = it }, label = "Пароль", isPassword = true)
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .clickable { showDatePickerDialog = true }
+            ) {
+                OutlinedTextField(
+                    value = birthDate,
+                    onValueChange = {},
+                    label = { Text("Дата рождения") },
+                    readOnly = true,
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            RegistrationTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = "Пароль",
+                isPassword = true
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = {
-                    // TODO: логика регистрации
-                    navController.navigate("login") {
-                        popUpTo("login") { inclusive = true }
+                    if (fullName.isBlank() || phone.isBlank() || email.isBlank() || birthDate.isBlank() || password.isBlank()) {
+                        Toast.makeText(context, "Пожалуйста, заполните все поля", Toast.LENGTH_SHORT).show()
+                        Log.w("SnackStore", "Попытка регистрации с неполными данными")
+                        return@Button
                     }
+
+                    val parts = fullName.trim().split(" ")
+                    val client = Client(
+                        first_name = parts.getOrNull(1),
+                        second_name = parts.getOrNull(0),
+                        third_name = parts.getOrNull(2),
+                        birth_day = birthDate,
+                        phone_number = phone,
+                        email = email,
+                        password = password
+                    )
+                    Log.d("SnackStore", "Попытка регистрации: $email")
+                    viewModel.register(client)
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White)
@@ -213,7 +315,6 @@ fun RegisterScreen(navController: NavHostController) {
         }
     }
 }
-
 
 @Composable
 fun RegistrationTextField(
@@ -245,19 +346,22 @@ fun RegistrationTextField(
 
 
 @Composable
-fun MainScreen(navController: NavHostController) {
+fun MainScreen(
+    navController: NavHostController,
+    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current))
+) {
+    val goodsList by goodsViewModel.goodsList.collectAsState()
+
     Column(modifier = Modifier.fillMaxSize()) {
         TopBar(navController)
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
-            modifier = Modifier
-                .fillMaxSize(),
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header - баннер на всю ширину (2 колонки)
             item(span = { GridItemSpan(maxLineSpan) }) {
                 BannerSlider(
                     modifier = Modifier
@@ -266,15 +370,8 @@ fun MainScreen(navController: NavHostController) {
                 )
             }
 
-
-            items(20) { index ->
-                ProductCard(
-                    product = Product(
-                        name = "Товар $index",
-                        price = "0000 руб",
-                        imageRes = R.drawable.fool
-                    )
-                )
+            items(goodsList) { good ->
+                ProductCard(good)
             }
         }
     }
@@ -337,16 +434,11 @@ fun TopBar(navController: NavHostController) {
 }
 
 @Composable
-fun ProductGrid(modifier: Modifier = Modifier) {
-    val products = remember {
-        List(20) { index ->
-            Product(
-                name = "Товар $index",
-                price = "0000 руб",
-                imageRes = R.drawable.fool
-            )
-        }
-    }
+fun ProductGrid(
+    modifier: Modifier = Modifier,
+    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current))
+) {
+    val goodsList by goodsViewModel.goodsList.collectAsState()
 
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -355,16 +447,15 @@ fun ProductGrid(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(products) { product ->
-            ProductCard(product)
+        items(goodsList) { good ->
+            ProductCard(good)
         }
     }
 }
 
-data class Product(val name: String, val price: String, val imageRes: Int)
 
 @Composable
-fun ProductCard(product: Product, onAddToCart: (Product) -> Unit = {}) {
+fun ProductCard(good: Goods, onAddToCart: (Goods) -> Unit = {}) {
     var isLiked by remember { mutableStateOf(false) }
 
     Column(
@@ -381,8 +472,8 @@ fun ProductCard(product: Product, onAddToCart: (Product) -> Unit = {}) {
                 .height(150.dp)
         ) {
             Image(
-                painter = painterResource(id = product.imageRes),
-                contentDescription = null,
+                painter = painterResource(id = getImageResByName(good.image_path)),
+                contentDescription = good.name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
@@ -407,13 +498,17 @@ fun ProductCard(product: Product, onAddToCart: (Product) -> Unit = {}) {
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(product.name, style = MaterialTheme.typography.bodyMedium)
-            Text(product.price, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+            Text(good.name ?: "Без имени", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = "${good.price ?: "0"} руб" + if ((good.discount ?: 0) > 0) " (-${good.discount}%)" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
-                onClick = { onAddToCart(product) },
+                onClick = { onAddToCart(good) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -424,6 +519,16 @@ fun ProductCard(product: Product, onAddToCart: (Product) -> Unit = {}) {
         }
     }
 }
+
+@Composable
+fun getImageResByName(imageName: String?): Int {
+    val context = LocalContext.current
+    if (imageName.isNullOrEmpty()) return R.drawable.fool
+    val resourceName = imageName.substringBeforeLast('.')
+    return context.resources.getIdentifier(resourceName, "drawable", context.packageName).takeIf { it != 0 } ?: R.drawable.fool
+}
+
+
 
 @Composable
 fun ProfileScreen(navController: NavHostController) {

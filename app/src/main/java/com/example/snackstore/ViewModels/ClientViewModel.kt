@@ -1,6 +1,8 @@
 package com.example.snackstore.ViewModels
 
 import android.app.Application
+import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -24,9 +26,21 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
 
     fun login(email: String, password: String) {
         viewModelScope.launch {
-            authResult = dao.getClientByEmailAndPassword(email, password)
+            val client = dao.getClientByEmailAndPassword(email, password)
+            authResult = client
+            client?.let {
+                saveClientIdToPrefs(it.id.toLong())
+            }
         }
     }
+
+
+    private fun saveClientIdToPrefs(clientId: Long) {
+        val sharedPrefs = getApplication<Application>().getSharedPreferences("SnackStorePrefs", Context.MODE_PRIVATE)
+        sharedPrefs.edit().putLong("client_id", clientId).apply()
+        Log.d("SnackStore", "Client ID сохранён: $clientId")
+    }
+
 
     fun register(client: Client) {
         viewModelScope.launch {
