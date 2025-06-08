@@ -31,4 +31,12 @@ interface GoodsDao {
 
     @Query("SELECT * FROM Goods WHERE id = :id")
     suspend fun getGoodById(id: Int): Goods?
+
+
+        @Query("SELECT * FROM goods WHERE name LIKE :query")
+        suspend fun searchByName(query: String): List<Goods>
+
+
 }
+
+

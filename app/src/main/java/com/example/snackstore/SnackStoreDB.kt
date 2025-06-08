@@ -51,7 +51,7 @@ abstract class SnackStoreDatabase : RoomDatabase() {
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
-                            Log.d("SnackStore", "БД создана. Предзаполнение...")
+                            Log.d("Prepopulate", "БД создана. Предзаполнение...")
                             // Используем instance напрямую!
                             CoroutineScope(Dispatchers.IO).launch {
                                 prepopulateDatabase(INSTANCE!!)
@@ -130,7 +130,77 @@ abstract class SnackStoreDatabase : RoomDatabase() {
             )
 
             val favorite = FavoriteGoods(1, 1, 1)
-            val tag = GoodsTags(1, 1, "Снэк")
+            val tag = listOf(
+                // Газированный напиток (good_id: 1..7)
+                GoodsTags(id = 1, good_id = 1, tag = "Газированный напиток"),
+                GoodsTags(id = 2, good_id = 2, tag = "Газированный напиток"),
+                GoodsTags(id = 3, good_id = 3, tag = "Газированный напиток"),
+                GoodsTags(id = 4, good_id = 4, tag = "Газированный напиток"),
+                GoodsTags(id = 5, good_id = 5, tag = "Газированный напиток"),
+                GoodsTags(id = 6, good_id = 6, tag = "Газированный напиток"),
+                GoodsTags(id = 7, good_id = 7, tag = "Газированный напиток"),
+
+                // Чипсы (good_id: 8..12)
+                GoodsTags(id = 8, good_id = 8, tag = "Чипсы"),
+                GoodsTags(id = 9, good_id = 9, tag = "Чипсы"),
+                GoodsTags(id = 10, good_id = 10, tag = "Чипсы"),
+                GoodsTags(id = 11, good_id = 11, tag = "Чипсы"),
+                GoodsTags(id = 12, good_id = 12, tag = "Чипсы"),
+
+                // Энергетический напиток (good_id: 18..22)
+                GoodsTags(id = 13, good_id = 18, tag = "Энергетический напиток"),
+                GoodsTags(id = 14, good_id = 19, tag = "Энергетический напиток"),
+                GoodsTags(id = 15, good_id = 20, tag = "Энергетический напиток"),
+                GoodsTags(id = 16, good_id = 21, tag = "Энергетический напиток"),
+                GoodsTags(id = 17, good_id = 22, tag = "Энергетический напиток"),
+
+                // Сок (good_id: 23..27)
+                GoodsTags(id = 18, good_id = 23, tag = "Сок"),
+                GoodsTags(id = 19, good_id = 24, tag = "Сок"),
+                GoodsTags(id = 20, good_id = 25, tag = "Сок"),
+                GoodsTags(id = 21, good_id = 26, tag = "Сок"),
+                GoodsTags(id = 22, good_id = 27, tag = "Сок"),
+
+                // Морс (good_id: 28..32)
+                GoodsTags(id = 23, good_id = 28, tag = "Морс"),
+                GoodsTags(id = 24, good_id = 29, tag = "Морс"),
+                GoodsTags(id = 25, good_id = 30, tag = "Морс"),
+                GoodsTags(id = 26, good_id = 31, tag = "Морс"),
+                GoodsTags(id = 27, good_id = 32, tag = "Морс"),
+
+                // Компот (good_id: 33..36)
+                GoodsTags(id = 28, good_id = 33, tag = "Компот"),
+                GoodsTags(id = 29, good_id = 34, tag = "Компот"),
+                GoodsTags(id = 30, good_id = 35, tag = "Компот"),
+                GoodsTags(id = 31, good_id = 36, tag = "Компот"),
+
+                // Орехи (good_id: 37..41)
+                GoodsTags(id = 32, good_id = 37, tag = "Орехи"),
+                GoodsTags(id = 33, good_id = 38, tag = "Орехи"),
+                GoodsTags(id = 34, good_id = 39, tag = "Орехи"),
+                GoodsTags(id = 35, good_id = 41, tag = "Орехи"),
+
+                // Семечки (good_id: 42..46)
+                GoodsTags(id = 36, good_id = 42, tag = "Семечки"),
+                GoodsTags(id = 37, good_id = 43, tag = "Семечки"),
+                GoodsTags(id = 38, good_id = 44, tag = "Семечки"),
+                GoodsTags(id = 39, good_id = 45, tag = "Семечки"),
+                GoodsTags(id = 40, good_id = 46, tag = "Семечки"),
+
+                // Сушёные морепродукты (good_id: 47..50)
+                GoodsTags(id = 41, good_id = 47, tag = "Сушёные морепродукты"),
+                GoodsTags(id = 42, good_id = 48, tag = "Сушёные морепродукты"),
+                GoodsTags(id = 43, good_id = 49, tag = "Сушёные морепродукты"),
+                GoodsTags(id = 44, good_id = 50, tag = "Сушёные морепродукты"),
+
+                // Сухарики (good_id: 51..54)
+                GoodsTags(id = 45, good_id = 51, tag = "Сухарики"),
+                GoodsTags(id = 46, good_id = 52, tag = "Сухарики"),
+                GoodsTags(id = 47, good_id = 53, tag = "Сухарики"),
+                GoodsTags(id = 48, good_id = 54, tag = "Сухарики"),
+            )
+
+
             val order = Order(1, 1, "ул. Пушкина, д. 10", 1, "2025-06-08")
             val ordered = OrderedGoods(1, 1, 2, 3)
             val cartItem = CartItem(1, 1, 3, 2)
@@ -151,7 +221,7 @@ abstract class SnackStoreDatabase : RoomDatabase() {
             favoriteDao.insert(favorite)
 
             Log.d("Prepopulate", "Добавление тега...")
-            tagsDao.insert(tag)
+            tagsDao.insertAll(tag)
 
             Log.d("Prepopulate", "Добавление заказа...")
             ordersDao.insert(order)

@@ -51,10 +51,11 @@ import java.util.Locale
 import android.app.DatePickerDialog
 import android.content.Context
 import android.util.Log
-
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.snackstore.ViewModels.CartViewModel
@@ -86,6 +87,18 @@ fun AppNavigation() {
         composable("profile") { ProfileScreen(navController) }
         composable("edit_profile") { EditProfileScreen(navController) }
         composable("cart") { CartScreen(navController) }
+        composable("search") {
+            val application = LocalContext.current.applicationContext as Application
+            SearchScreen(navController = navController, application = application)
+        }
+        composable("tags") {
+            TagsScreen(navController = navController)
+        }
+        composable("products_by_tag/{tag}") { backStackEntry ->
+            val tag = backStackEntry.arguments?.getString("tag") ?: ""
+            ProductsByTagScreen(navController, tag)
+
+        }
     }
 }
 
@@ -424,8 +437,24 @@ fun TopBar(navController: NavHostController) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(imageVector = Icons.Filled.Menu, contentDescription = null, tint = Color.White)
-        Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = Color.White)
+        Icon(
+            imageVector = Icons.Filled.Menu,
+            contentDescription = "Меню",
+            tint = Color.White,
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .clickable {
+                    navController.navigate("tags")
+                }
+        )
+        Icon(
+            imageVector = Icons.Default.Search,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.clickable {
+                navController.navigate("search")
+            }
+        )
         Icon(
             imageVector = Icons.Default.ShoppingCart,
             contentDescription = null,
@@ -444,6 +473,247 @@ fun TopBar(navController: NavHostController) {
         )
     }
 }
+
+@Composable
+fun TagsScreen(
+    navController: NavHostController,
+    viewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application))
+) {
+    val tags by viewModel.allTags.collectAsState()
+    val accentColor = Color(0xFFD6A153)
+
+    Column(modifier = Modifier.fillMaxSize()) {
+
+        // Кастомный Top Bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = accentColor)
+            }
+            Text(
+                text = "Категории",
+                style = MaterialTheme.typography.headlineSmall,
+                color = accentColor
+            )
+        }
+
+        // Сетка с категориями
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(tags) { tag ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            navController.navigate("products_by_tag/$tag")
+                        },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFDF9F2)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = tag,
+                            style = MaterialTheme.typography.bodyLarge.copy(color = accentColor),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ProductsByTagScreen(
+    navController: NavHostController,
+    tag: String,
+    viewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application))
+) {
+    LaunchedEffect(tag) {
+        viewModel.selectTag(tag)
+    }
+
+    val accentColor = Color(0xFFD6A153)
+    val goods by viewModel.goodsByTag.collectAsState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .padding(16.dp)
+    ) {
+        // Кнопка Назад + заголовок
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = accentColor)
+            }
+            Text(
+                text = tag,
+                style = MaterialTheme.typography.headlineMedium,
+                color = accentColor
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (goods.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Товаров в этой категории пока нет", color = accentColor)
+            }
+        } else {
+            GoodsGrid(
+                goods = goods,
+                modifier = Modifier.fillMaxSize(),
+                onItemClick = { /* обработка клика */ },
+                onAddToCart = { good -> viewModel.addToCart(good) }, // Добавлено
+                onToggleFavorite = { good -> viewModel.toggleFavorite(good) }
+            )
+        }
+    }
+}
+
+
+
+@Composable
+fun GoodsGrid(
+    goods: List<Goods>,
+    modifier: Modifier = Modifier,
+    onItemClick: ((Goods) -> Unit)? = null,
+    onAddToCart: (Goods) -> Unit = {},
+    onToggleFavorite: (Goods) -> Unit = {}
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = modifier,
+        contentPadding = PaddingValues(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(goods) { good ->
+            ProductCard(
+                good = good,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
+                    .clickable { onItemClick?.invoke(good) },
+                onAddToCart = onAddToCart,
+                onToggleFavorite = onToggleFavorite
+            )
+        }
+    }
+}
+
+
+@Composable
+fun SearchScreen(
+    navController: NavHostController,
+    application: Application
+) {
+    val viewModel: GoodsViewModel = viewModel(
+        factory = GoodsViewModelFactory(application)
+    )
+
+    var query by remember { mutableStateOf("") }
+    val searchResults by viewModel.searchResults.collectAsState()
+
+    val accentColor = Color(0xFFD6A153)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .padding(16.dp)
+    ) {
+        // Верхняя панель с кнопкой назад и заголовком
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Назад",
+                    tint = accentColor
+                )
+            }
+            Text(
+                text = "Поиск товаров",
+                style = MaterialTheme.typography.titleMedium.copy(color = accentColor),
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        OutlinedTextField(
+            value = query,
+            onValueChange = {
+                query = it
+                viewModel.searchGoods(it)
+            },
+            label = { Text("Введите название товара", color = accentColor) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color(0xFFFDF9F2),
+                unfocusedContainerColor = Color(0xFFFDF9F2),
+                focusedIndicatorColor = accentColor,
+                unfocusedIndicatorColor = accentColor.copy(alpha = 0.5f),
+                cursorColor = accentColor,
+                focusedLabelColor = accentColor,
+                unfocusedLabelColor = accentColor.copy(alpha = 0.7f),
+                focusedTextColor = accentColor,
+                unfocusedTextColor = accentColor.copy(alpha = 0.9f)
+            ),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            items(searchResults) { good ->
+                Card(
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFDF9F2)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
+                        .clickable {
+                            /* TODO: действие по клику на товар */
+                        }
+                ) {
+                    Text(
+                        text = good.name ?: "",
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyLarge.copy(color = accentColor)
+                    )
+                }
+            }
+        }
+    }
+}
+
 
 @Composable
 fun ProductGrid(
