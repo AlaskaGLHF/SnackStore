@@ -53,6 +53,9 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
         authResult = null
         registrationSuccess = false
     }
+
+    fun getClientById(clientId: Long) = dao.getClientById(clientId)
+
 }
 
 class ClientViewModelFactory(private val application: Application) : ViewModelProvider.Factory {

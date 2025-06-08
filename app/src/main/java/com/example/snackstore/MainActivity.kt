@@ -49,6 +49,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import android.app.DatePickerDialog
+import android.content.Context
 import android.util.Log
 
 import androidx.compose.material3.Button
@@ -348,34 +349,40 @@ fun RegistrationTextField(
 @Composable
 fun MainScreen(
     navController: NavHostController,
-    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current))
+    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application))
 ) {
     val goodsList by goodsViewModel.goodsList.collectAsState()
+    val favorites by goodsViewModel.favoriteGoodsIds.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopBar(navController)
 
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
+        LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(bottom = 80.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
+            item {
                 BannerSlider(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(160.dp)
+                        .padding(8.dp)
                 )
             }
 
-            items(goodsList) { good ->
-                ProductCard(good)
+            item {
+                ProductGrid(
+                    goodsList = goodsList,
+                    favorites = favorites,
+                    onToggleFavorite = { goodsViewModel.toggleFavorite(it) },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
 }
+
 
 @Composable
 fun BannerSlider(modifier: Modifier = Modifier) {
@@ -436,36 +443,52 @@ fun TopBar(navController: NavHostController) {
 @Composable
 fun ProductGrid(
     modifier: Modifier = Modifier,
-    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current))
+    goodsList: List<Goods>,
+    favorites: Set<Int>,
+    onToggleFavorite: (Goods) -> Unit,
 ) {
-    val goodsList by goodsViewModel.goodsList.collectAsState()
-
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = modifier.padding(8.dp),
-        contentPadding = PaddingValues(bottom = 80.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(goodsList) { good ->
-            ProductCard(good)
+    Column(modifier = modifier.padding(8.dp)) {
+        goodsList.chunked(2).forEach { rowGoods ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                for (good in rowGoods) {
+                    ProductCard(
+                        good = good,
+                        isInitiallyLiked = favorites.contains(good.id),
+                        modifier = Modifier.weight(1f),
+                        onToggleFavorite = { onToggleFavorite(it) }
+                    )
+                }
+                if (rowGoods.size < 2) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
         }
     }
 }
 
 
+
 @Composable
-fun ProductCard(good: Goods, onAddToCart: (Goods) -> Unit = {}) {
-    var isLiked by remember { mutableStateOf(false) }
+fun ProductCard(
+    good: Goods,
+    modifier: Modifier = Modifier,
+    isInitiallyLiked: Boolean = false,
+    onAddToCart: (Goods) -> Unit = {},
+    onToggleFavorite: (Goods) -> Unit = {}
+) {
+    var isLiked by remember { mutableStateOf(isInitiallyLiked) }
 
     Column(
-        modifier = Modifier
-            .width(180.dp)
+        modifier = modifier
             .padding(8.dp)
             .background(Color.LightGray, shape = RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
             .border(1.dp, Color.Gray.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-    ) {
+            .width(IntrinsicSize.Min) // чтобы карточка не растягивалась больше нужного
+    )  {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -481,12 +504,15 @@ fun ProductCard(good: Goods, onAddToCart: (Goods) -> Unit = {}) {
             Icon(
                 imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 contentDescription = if (isLiked) "Liked" else "Not liked",
-                tint = if (isLiked) Color.Red else Color.White,
+                tint = if (isLiked) Color.Red else Color.Black,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(8.dp)
                     .size(24.dp)
-                    .clickable { isLiked = !isLiked }
+                    .clickable {
+                        isLiked = !isLiked
+                        onToggleFavorite(good)
+                    }
             )
         }
 
@@ -512,13 +538,15 @@ fun ProductCard(good: Goods, onAddToCart: (Goods) -> Unit = {}) {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text("Добавить в корзину")
+                Text("В корзину")
             }
 
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }
+
+
 
 @Composable
 fun getImageResByName(imageName: String?): Int {
@@ -531,11 +559,27 @@ fun getImageResByName(imageName: String?): Int {
 
 
 @Composable
-fun ProfileScreen(navController: NavHostController) {
-    var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("Избранное", "Заказы")
+fun ProfileScreen(
+    navController: NavHostController,
+    clientViewModel: ClientViewModel = viewModel(factory = ClientViewModelFactory(LocalContext.current.applicationContext as Application))
+) {
+    val context = LocalContext.current
+
+    val sharedPrefs = context.getSharedPreferences("SnackStorePrefs", Context.MODE_PRIVATE)
+    val clientId = sharedPrefs.getLong("client_id", -1L)
+
+    val clientFlow = remember(clientId) {
+        if (clientId != -1L) clientViewModel.getClientById(clientId)
+        else null
+    }
+
+    val client by clientFlow?.collectAsState(initial = null) ?: remember { mutableStateOf(null) }
+    var selectedTabIndex by remember { mutableStateOf(0) }
+
+    val tabTitles = listOf("Избранное", "Заказы")
 
     Column(modifier = Modifier.fillMaxSize()) {
+        // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -573,13 +617,30 @@ fun ProfileScreen(navController: NavHostController) {
                 Spacer(modifier = Modifier.width(16.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Имя", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = client?.first_name ?: "Имя",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("00.00.0000", color = Color.White, fontSize = 14.sp)
+                    Text(
+                        text = client?.birth_day ?: "00.00.0000",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("+70000000000", color = Color.White, fontSize = 14.sp)
+                    Text(
+                        text = client?.phone_number ?: "+70000000000",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("email@email.ru", color = Color.White, fontSize = 14.sp)
+                    Text(
+                        text = client?.email ?: "email@email.ru",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
                 }
 
                 IconButton(
@@ -595,62 +656,38 @@ fun ProfileScreen(navController: NavHostController) {
                         modifier = Modifier.size(24.dp)
                     )
                 }
-
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White)
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+        // Tabs
+        TabRow(
+            selectedTabIndex = selectedTabIndex,
+            containerColor = Color.White,
+            contentColor = Color(0xFFD6A153)
         ) {
-            tabs.forEachIndexed { index, title ->
-                Column(
-                    modifier = Modifier
-                        .clickable { selectedTab = index }
-                        .padding(horizontal = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+            tabTitles.forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedTabIndex == index,
+                    onClick = { selectedTabIndex = index },
+                    text = {
                         Text(
                             text = title,
-                            color = if (selectedTab == index) Color(0xFFD6A153) else Color.Gray,
-                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = if (title == "Избранное") Icons.Default.FavoriteBorder else Icons.Default.ShoppingCart,
-                            contentDescription = null,
-                            tint = if (selectedTab == index) Color(0xFFD6A153) else Color.Gray
+                            fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Normal
                         )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    if (selectedTab == index) {
-                        Box(
-                            modifier = Modifier
-                                .height(2.dp)
-                                .width(40.dp)
-                                .background(Color(0xFFD6A153))
-                        )
-                    }
-                }
+                )
             }
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            when (selectedTab) {
-                0 -> FavoriteList()
-                1 -> OrdersList()
-            }
+        // Content
+        when (selectedTabIndex) {
+            0 -> FavoriteList()
+            1 -> OrdersList()
         }
     }
 }
+
+
 
 @Composable
 fun EditProfileScreen(navController: NavHostController) {
@@ -714,11 +751,16 @@ fun EditProfileScreen(navController: NavHostController) {
 
 
 @Composable
-fun FavoriteList() {
-    Box(modifier = Modifier.fillMaxSize()) {
-        ProductGrid()
+fun FavoriteList(goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application))) {
+    val favorites by goodsViewModel.favoriteGoodsList.collectAsState()
+
+    LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.fillMaxSize()) {
+        items(favorites) { good ->
+            ProductCard(good = good)
+        }
     }
 }
+
 
 @Composable
 fun OrdersList() {
