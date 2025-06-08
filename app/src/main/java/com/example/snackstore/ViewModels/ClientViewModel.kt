@@ -12,6 +12,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.snackstore.SnackStoreDatabase
 import com.example.snackstore.entity.Client
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class ClientViewModel(application: Application) : AndroidViewModel(application) {
@@ -23,6 +25,9 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
 
     var registrationSuccess by mutableStateOf(false)
         private set
+
+    private val _client = MutableStateFlow<Client?>(null)
+    val client: StateFlow<Client?> = _client
 
     fun login(email: String, password: String) {
         viewModelScope.launch {
@@ -55,6 +60,14 @@ class ClientViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun getClientById(clientId: Long) = dao.getClientById(clientId)
+
+    fun loadClient(clientId: Long) {
+        viewModelScope.launch {
+            dao.getClientById(clientId).collect { clientData ->
+                _client.value = clientData
+            }
+        }
+    }
 
 }
 

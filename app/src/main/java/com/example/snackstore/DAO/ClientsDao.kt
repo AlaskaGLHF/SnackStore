@@ -23,4 +23,7 @@ interface ClientsDao {
     @Query("SELECT * FROM clients WHERE id = :clientId LIMIT 1")
     fun getClientById(clientId: Long): Flow<Client?>
 
+    @Update
+    suspend fun updateClient(client: Client)
+
 }

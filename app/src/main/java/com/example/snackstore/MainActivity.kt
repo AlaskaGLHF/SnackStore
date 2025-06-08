@@ -1,5 +1,6 @@
 package com.example.snackstore
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.os.Bundle
 import android.widget.Toast
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,6 +55,9 @@ import android.util.Log
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import com.example.snackstore.ViewModels.EditProfileViewModel
 import com.example.snackstore.ViewModels.GoodsViewModel
 import com.example.snackstore.ViewModels.GoodsViewModelFactory
 import com.example.snackstore.entity.Goods
@@ -548,6 +551,7 @@ fun ProductCard(
 
 
 
+@SuppressLint("DiscouragedApi")
 @Composable
 fun getImageResByName(imageName: String?): Int {
     val context = LocalContext.current
@@ -690,12 +694,61 @@ fun ProfileScreen(
 
 
 @Composable
-fun EditProfileScreen(navController: NavHostController) {
+fun EditProfileScreen(
+    navController: NavHostController,
+    clientViewModel: ClientViewModel = viewModel(
+        factory = ClientViewModelFactory(LocalContext.current.applicationContext as Application)
+    )
+) {
+    val context = LocalContext.current.applicationContext as Application
+
+    val editProfileViewModel: EditProfileViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return EditProfileViewModel(context) as T
+            }
+        }
+    )
+
+    val client by editProfileViewModel.client.collectAsState()
+
     var fullName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var birthDate by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+
+    // Для DatePicker
+    val calendar = remember { Calendar.getInstance() }
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()) }
+    var showDatePickerDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(client) {
+        client?.let {
+            fullName = it.first_name ?: ""
+            phone = it.phone_number ?: ""
+            email = it.email ?: ""
+            birthDate = it.birth_day ?: ""
+            password = it.password ?: ""
+        }
+    }
+
+    if (showDatePickerDialog) {
+        DatePickerDialog(
+            LocalContext.current,
+            { _, year, month, dayOfMonth ->
+                calendar.set(year, month, dayOfMonth)
+                birthDate = dateFormat.format(calendar.time)
+                showDatePickerDialog = false
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply {
+            setOnCancelListener { showDatePickerDialog = false }
+        }.show()
+    }
 
     val backgroundColor = Color.White
     val textColor = Color(0xFFD6A153)
@@ -729,15 +782,52 @@ fun EditProfileScreen(navController: NavHostController) {
             RegistrationTextField(value = fullName, onValueChange = { fullName = it }, label = "ФИО", textColor = textColor)
             RegistrationTextField(value = phone, onValueChange = { phone = it }, label = "Телефон", textColor = textColor)
             RegistrationTextField(value = email, onValueChange = { email = it }, label = "Почта", textColor = textColor)
-            RegistrationTextField(value = birthDate, onValueChange = { birthDate = it }, label = "Дата рождения", textColor = textColor)
-            RegistrationTextField(value = password, onValueChange = { password = it }, label = "Пароль", isPassword = true, textColor = textColor)
+
+            // Поле с выбором даты — показываем DatePicker по клику
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .clickable { showDatePickerDialog = true }
+            ) {
+                OutlinedTextField(
+                    value = birthDate,
+                    onValueChange = {},
+                    label = { Text("Дата рождения") },
+                    readOnly = true,
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            RegistrationTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = "Пароль",
+                isPassword = true,
+                textColor = textColor
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = {
-                    // TODO: логика сохранения
-                    navController.popBackStack()
+                    if (client != null) {
+                        val updatedClient = client!!.copy(
+                            first_name = fullName,
+                            phone_number = phone,
+                            email = email,
+                            birth_day = birthDate,
+                            password = password
+                        )
+                        Log.d("EditProfileScreen", "Обновляем профиль: $updatedClient")
+                        editProfileViewModel.updateClient(updatedClient)
+
+                        // Обновляем данные клиента в общем ClientViewModel
+                        clientViewModel.loadClient(updatedClient.id.toLong())
+
+                        navController.popBackStack()
+                    }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = textColor)
