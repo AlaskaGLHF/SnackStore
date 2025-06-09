@@ -21,7 +21,6 @@ interface GoodsDao {
     @Delete
     suspend fun delete(goods: Goods)
 
-    // 🔽 Новый метод: получить избранные товары пользователя
     @Query("""
         SELECT Goods.* FROM Goods
         INNER JOIN Favorite_Goods ON Goods.id = Favorite_Goods.goods_id

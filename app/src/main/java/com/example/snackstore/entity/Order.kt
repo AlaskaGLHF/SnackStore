@@ -19,3 +19,16 @@ data class Order(
     val delivery_driver_id: Int?,
     val date: String?
 )
+data class OrderWithGoodsInfo(
+    val orderId: Int,
+    val date: String?,
+    val totalPrice: Int,
+    val goods: List<GoodsInfo>
+)
+
+data class GoodsInfo(
+    val goodId: Int,
+    val name: String,
+    val imagePath: String, // <--- именно image_path, как в entity
+    val price: Int
+)

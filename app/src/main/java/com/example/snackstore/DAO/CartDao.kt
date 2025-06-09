@@ -5,7 +5,9 @@ import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.example.snackstore.entity.CartItem
+import com.example.snackstore.entity.CartItemWithGood
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -42,6 +44,10 @@ interface CartDao {
     WHERE Cart_Items.client_id = :clientId
 """)
     fun getDetailedCartItems(clientId: Long): Flow<List<CartItemWithInfo>>
+
+    @Transaction
+    @Query("SELECT * FROM Cart_Items WHERE client_id = :clientId")
+    fun getCartItemsWithGoods(clientId: Int): Flow<List<CartItemWithGood>>
 
 }
 data class CartItemWithInfo(

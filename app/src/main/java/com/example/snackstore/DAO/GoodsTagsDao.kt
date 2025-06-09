@@ -14,8 +14,6 @@ interface GoodsTagsDao {
     @Query("SELECT * FROM Goods_Tags WHERE good_id = :goodId")
     suspend fun getTagsByGood(goodId: Int): List<GoodsTags>
 
-
-
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(goodsTags: List<GoodsTags>)
 

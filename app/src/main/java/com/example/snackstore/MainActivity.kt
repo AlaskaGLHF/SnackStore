@@ -50,7 +50,9 @@ import java.util.Calendar
 import java.util.Locale
 import android.app.DatePickerDialog
 import android.content.Context
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -59,15 +61,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.snackstore.ViewModels.CartViewModel
+import com.example.snackstore.ViewModels.CartViewModelFactory
 import com.example.snackstore.ViewModels.EditProfileViewModel
 import com.example.snackstore.ViewModels.GoodsViewModel
 import com.example.snackstore.ViewModels.GoodsViewModelFactory
+import com.example.snackstore.ViewModels.OrdersViewModel
 import com.example.snackstore.entity.Goods
-import kotlinx.coroutines.launch
-import java.util.Date
-
 
 class MainActivity : ComponentActivity() {
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -76,6 +78,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
@@ -86,7 +89,11 @@ fun AppNavigation() {
         composable("register") { RegisterScreen(navController) }
         composable("profile") { ProfileScreen(navController) }
         composable("edit_profile") { EditProfileScreen(navController) }
-        composable("cart") { CartScreen(navController) }
+        composable("cart") {
+            val cartViewModel: CartViewModel = viewModel()
+            CartScreen(navController = navController, cartViewModel = cartViewModel)
+        }
+
         composable("search") {
             val application = LocalContext.current.applicationContext as Application
             SearchScreen(navController = navController, application = application)
@@ -99,6 +106,10 @@ fun AppNavigation() {
             ProductsByTagScreen(navController, tag)
 
         }
+        composable("personal_recommendations") {
+            PersonalRecommendationsScreen(navController)
+        }
+
     }
 }
 
@@ -363,11 +374,11 @@ fun RegistrationTextField(
     )
 }
 
-
 @Composable
 fun MainScreen(
     navController: NavHostController,
-    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application))
+    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application)),
+    cartViewModel: CartViewModel = viewModel(factory = CartViewModelFactory(LocalContext.current.applicationContext as Application))
 ) {
     val goodsList by goodsViewModel.goodsList.collectAsState()
     val favorites by goodsViewModel.favoriteGoodsIds.collectAsState()
@@ -390,10 +401,23 @@ fun MainScreen(
             }
 
             item {
+                Button(
+                    onClick = { navController.navigate("personal_recommendations") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD6A153))
+                ) {
+                    Text("Персональные рекомендации", color = Color.White)
+                }
+            }
+
+            item {
                 ProductGrid(
                     goodsList = goodsList,
                     favorites = favorites,
                     onToggleFavorite = { goodsViewModel.toggleFavorite(it) },
+                    onAddToCart = { good -> cartViewModel.addToCart(good) },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -401,6 +425,54 @@ fun MainScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PersonalRecommendationsScreen(
+    navController: NavHostController,
+    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application)),
+    cartViewModel: CartViewModel = viewModel(factory = CartViewModelFactory(LocalContext.current.applicationContext as Application))
+) {
+    val allGoods by goodsViewModel.goodsList.collectAsState()
+    val recommendations = remember(allGoods) { allGoods.shuffled().take(10) }
+    val favorites by goodsViewModel.favoriteGoodsIds.collectAsState()
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopAppBar(
+            title = { Text("Персональные рекомендации") },
+            navigationIcon = {
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = Color.White)
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color(0xFFD6A153),
+                titleContentColor = Color.White,
+                actionIconContentColor = Color.White
+            )
+        )
+
+        if (recommendations.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Нет доступных товаров")
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(8.dp)
+            ) {
+                item {
+                    ProductGrid(
+                        goodsList = recommendations,
+                        favorites = favorites,
+                        onToggleFavorite = { goodsViewModel.toggleFavorite(it) },
+                        onAddToCart = { cartViewModel.addToCart(it) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun BannerSlider(modifier: Modifier = Modifier) {
@@ -477,14 +549,13 @@ fun TopBar(navController: NavHostController) {
 @Composable
 fun TagsScreen(
     navController: NavHostController,
-    viewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application))
+    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application)),
 ) {
-    val tags by viewModel.allTags.collectAsState()
+    val tags by goodsViewModel.allTags.collectAsState()
     val accentColor = Color(0xFFD6A153)
 
     Column(modifier = Modifier.fillMaxSize()) {
 
-        // Кастомный Top Bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -502,7 +573,6 @@ fun TagsScreen(
             )
         }
 
-        // Сетка с категориями
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier
@@ -542,14 +612,16 @@ fun TagsScreen(
 fun ProductsByTagScreen(
     navController: NavHostController,
     tag: String,
-    viewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application))
+    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application)),
+    cartViewModel: CartViewModel = viewModel()
 ) {
     LaunchedEffect(tag) {
-        viewModel.selectTag(tag)
+        goodsViewModel.selectTag(tag)
     }
 
     val accentColor = Color(0xFFD6A153)
-    val goods by viewModel.goodsByTag.collectAsState()
+    val goods by goodsViewModel.goodsByTag.collectAsState()
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -557,7 +629,6 @@ fun ProductsByTagScreen(
             .background(Color.White)
             .padding(16.dp)
     ) {
-        // Кнопка Назад + заголовок
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -582,14 +653,15 @@ fun ProductsByTagScreen(
                 goods = goods,
                 modifier = Modifier.fillMaxSize(),
                 onItemClick = { /* обработка клика */ },
-                onAddToCart = { good -> viewModel.addToCart(good) }, // Добавлено
-                onToggleFavorite = { good -> viewModel.toggleFavorite(good) }
+                onAddToCart = { good ->
+                    cartViewModel.addToCart(good)
+                    Toast.makeText(context, "Товар '${good.name}' добавлен в корзину", Toast.LENGTH_SHORT).show()
+                },
+                onToggleFavorite = { good -> goodsViewModel.toggleFavorite(good) }
             )
         }
     }
 }
-
-
 
 @Composable
 fun GoodsGrid(
@@ -620,7 +692,6 @@ fun GoodsGrid(
     }
 }
 
-
 @Composable
 fun SearchScreen(
     navController: NavHostController,
@@ -641,7 +712,6 @@ fun SearchScreen(
             .background(Color.White)
             .padding(16.dp)
     ) {
-        // Верхняя панель с кнопкой назад и заголовком
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -685,7 +755,6 @@ fun SearchScreen(
             shape = RoundedCornerShape(12.dp)
         )
 
-
         Spacer(modifier = Modifier.height(16.dp))
 
         LazyColumn(
@@ -714,13 +783,13 @@ fun SearchScreen(
     }
 }
 
-
 @Composable
 fun ProductGrid(
     modifier: Modifier = Modifier,
     goodsList: List<Goods>,
     favorites: Set<Int>,
     onToggleFavorite: (Goods) -> Unit,
+    onAddToCart: (Goods) -> Unit
 ) {
     Column(modifier = modifier.padding(8.dp)) {
         goodsList.chunked(2).forEach { rowGoods ->
@@ -731,9 +800,10 @@ fun ProductGrid(
                 for (good in rowGoods) {
                     ProductCard(
                         good = good,
-                        isInitiallyLiked = favorites.contains(good.id),
+                        isLiked = favorites.contains(good.id),
                         modifier = Modifier.weight(1f),
-                        onToggleFavorite = { onToggleFavorite(it) }
+                        onToggleFavorite = { onToggleFavorite(it) },
+                        onAddToCart = { onAddToCart(it) }
                     )
                 }
                 if (rowGoods.size < 2) {
@@ -748,11 +818,11 @@ fun ProductGrid(
 fun ProductCard(
     good: Goods,
     modifier: Modifier = Modifier,
-    isInitiallyLiked: Boolean = false,
-    onAddToCart: (Goods) -> Unit = {},
-    onToggleFavorite: (Goods) -> Unit = {}
+    isLiked: Boolean = false,
+    onAddToCart: (Goods) -> Unit,
+    onToggleFavorite: (Goods) -> Unit
 ) {
-    var isLiked by remember { mutableStateOf(isInitiallyLiked) }
+    val context = LocalContext.current
 
     Column(
         modifier = modifier
@@ -760,8 +830,8 @@ fun ProductCard(
             .background(Color.LightGray, shape = RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
             .border(1.dp, Color.Gray.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-            .width(IntrinsicSize.Min) // чтобы карточка не растягивалась больше нужного
-    )  {
+            .width(IntrinsicSize.Min)
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -783,7 +853,6 @@ fun ProductCard(
                     .padding(8.dp)
                     .size(24.dp)
                     .clickable {
-                        isLiked = !isLiked
                         onToggleFavorite(good)
                     }
             )
@@ -807,7 +876,10 @@ fun ProductCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
-                onClick = { onAddToCart(good) },
+                onClick = {
+                    onAddToCart(good)
+                    Toast.makeText(context, "Товар добавлен в корзину", Toast.LENGTH_SHORT).show()
+                },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -831,8 +903,7 @@ fun getImageResByName(imageName: String?): Int {
     return context.resources.getIdentifier(resourceName, "drawable", context.packageName).takeIf { it != 0 } ?: R.drawable.fool
 }
 
-
-
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun ProfileScreen(
     navController: NavHostController,
@@ -934,7 +1005,6 @@ fun ProfileScreen(
             }
         }
 
-        // Tabs
         TabRow(
             selectedTabIndex = selectedTabIndex,
             containerColor = Color.White,
@@ -954,7 +1024,6 @@ fun ProfileScreen(
             }
         }
 
-        // Content
         when (selectedTabIndex) {
             0 -> FavoriteList()
             1 -> OrdersList()
@@ -1118,58 +1187,74 @@ fun EditProfileScreen(
     }
 }
 
-
-
 @Composable
-fun FavoriteList(goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application))) {
+fun FavoriteList(
+    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application))
+) {
     val favorites by goodsViewModel.favoriteGoodsList.collectAsState()
+    val favoriteIds by goodsViewModel.favoriteGoodsIds.collectAsState()
 
     LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.fillMaxSize()) {
         items(favorites) { good ->
-            ProductCard(good = good)
+            ProductCard(
+                good = good,
+                isLiked = favoriteIds.contains(good.id), // ✅ используем актуальное состояние
+                onAddToCart = { goodsViewModel.addToCart(it) },
+                onToggleFavorite = { goodsViewModel.toggleFavorite(it) }
+            )
         }
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun OrdersList() {
+fun OrdersList(viewModel: OrdersViewModel = viewModel()) {
+    val orders by viewModel.ordersWithGoods.collectAsState()
+
+    val sortedOrders = remember(orders) {
+        orders.sortedByDescending { order ->
+            runCatching {
+                java.time.LocalDate.parse(order.date)
+            }.getOrElse { java.time.LocalDate.MIN }
+        }
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        items(5) { index ->
+        items(sortedOrders) { order ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFD6A153) // Устанавливаем нужный фон
+                    containerColor = Color(0xFFD6A153)
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Дата заказа: 0${index + 1}.06.2025",
+                        text = "Дата заказа: ${order.date ?: "Неизвестно"}",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        text = "Сумма: ${(index + 1) * 1000} ₽",
+                        text = "Сумма: ${order.totalPrice} ₽",
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(3) { imgIndex ->
-                            Box(
+                        items(order.goods) { good ->
+                            Image(
+                                painter = painterResource(id = getImageResByName(good.imagePath)),
+                                contentDescription = good.name,
                                 modifier = Modifier
                                     .size(80.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.LightGray),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(text = "Фото ${imgIndex + 1}")
-                            }
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
                         }
                     }
                 }
@@ -1178,156 +1263,108 @@ fun OrdersList() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CartScreen(
     navController: NavHostController,
-    cartViewModel: CartViewModel = viewModel()
+    cartViewModel: CartViewModel = viewModel(
+        factory = CartViewModelFactory(LocalContext.current.applicationContext as Application)
+    )
 ) {
+    val cartItems by cartViewModel.cartItems.collectAsState()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val cartItems by cartViewModel
-        .cartDao
-        .getDetailedCartItems(cartViewModel.clientId)
-        .collectAsState(initial = emptyList())
 
     var address by remember { mutableStateOf("") }
-    val date = SimpleDateFormat("dd.MM.yy", Locale.getDefault()).format(Date())
-
-    val totalPrice = cartItems.sumOf {
-        val price = it.price?.toIntOrNull() ?: 0
-        price * it.item.quantity
-    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
     ) {
-        // Top bar
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .background(Color(0xFFD6A153))
-                .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Назад",
-                tint = Color.White,
-                modifier = Modifier
-                    .padding(start = 16.dp)
-                    .align(Alignment.CenterStart)
-                    .clickable { navController.popBackStack() }
+        TopAppBar(
+            title = {
+                Text("Корзина", color = Color.White)
+            },
+            navigationIcon = {
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = Color.White)
+                }
+            },
+            actions = {
+                Icon(
+                    imageVector = Icons.Default.ShoppingCart,
+                    contentDescription = "Корзина",
+                    tint = Color.White,
+                    modifier = Modifier.padding(end = 16.dp)
+                )
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color(0xFFD6A153)
             )
-        }
-
-        // Icon
-        Icon(
-            imageVector = Icons.Default.ShoppingCart,
-            contentDescription = "Корзина",
-            tint = Color(0xFFD6A153),
-            modifier = Modifier
-                .size(80.dp)
-                .align(Alignment.CenterHorizontally)
-                .padding(top = 16.dp)
         )
 
-        // Cart content box
-        Box(
+        OutlinedTextField(
+            value = address,
+            onValueChange = { address = it },
+            label = { Text("Введите адрес доставки") },
             modifier = Modifier
-                .padding(16.dp)
                 .fillMaxWidth()
-                .background(Color(0xFFF5F1E6), shape = RoundedCornerShape(16.dp))
                 .padding(16.dp)
+        )
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column {
-                // Date and total price
-                Row(
+            items(cartItems) { item ->
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F0F0)),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text(text = date, style = MaterialTheme.typography.bodyMedium)
-                    Text(text = "$totalPrice руб", style = MaterialTheme.typography.bodyMedium)
-                }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        val imageRes = getImageResByName(item.good.image_path)
 
-                Spacer(modifier = Modifier.height(12.dp))
+                        Image(
+                            painter = painterResource(id = imageRes),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
 
-                // Address field
-                OutlinedTextField(
-                    value = address,
-                    onValueChange = { address = it },
-                    placeholder = { Text("Поле адреса") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedIndicatorColor = Color(0xFFD6A153),
-                        unfocusedIndicatorColor = Color.Gray
-                    )
-                )
+                        Spacer(modifier = Modifier.width(12.dp))
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Cart items
-                cartItems.forEach {
-                    OrderItem(
-                        name = it.name ?: "Товар",
-                        price = "${it.price} руб x${it.item.quantity}"
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        Column {
+                            Text(text = item.good.name ?: "Неизвестный товар", style = MaterialTheme.typography.bodyLarge)
+                            Text(text = "Кол-во: ${item.cartItem.quantity}", style = MaterialTheme.typography.bodyMedium)
+                            Text(text = "Цена: ${item.good.price} ₽", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Confirm button
         Button(
             onClick = {
-                scope.launch {
-                    cartViewModel.confirmOrder()  // БД-операция
-                    Toast.makeText(context, "Ваш заказ успешно оформлен", Toast.LENGTH_SHORT).show()
-                    navController.navigate("main") {
-                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                    }
-                }
+                address = ""
+                cartViewModel.confirmOrder()
+                Toast.makeText(context, "Заказ оформлен", Toast.LENGTH_SHORT).show()
+                navController.popBackStack()
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .padding(16.dp),
+            enabled = cartItems.isNotEmpty(),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD6A153))
         ) {
-            Text(text = "Подтвердить заказ", color = Color.White)
+            Text("Оформить заказ", color = Color.White)
         }
-    }
-}
-
-
-
-
-@Composable
-fun OrderItem(name: String, price: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White, shape = RoundedCornerShape(12.dp))
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(Color.White, shape = RoundedCornerShape(8.dp))
-                    .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
-            ) {
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(text = name, style = MaterialTheme.typography.bodyMedium)
-        }
-
-        Text(text = price, style = MaterialTheme.typography.bodyMedium, color = Color.Black)
     }
 }

@@ -101,9 +101,7 @@ class GoodsViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             Log.d("Cart", "Добавлено в корзину: ${good.name}")
-            // Заглушка — здесь позже можно вставить insert в CartDao
-            // Пример:
-            // cartDao.insert(CartItem(0, clientId, good.id, 1))
+
         }
     }
 

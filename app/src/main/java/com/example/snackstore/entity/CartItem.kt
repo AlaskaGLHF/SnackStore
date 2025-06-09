@@ -1,9 +1,11 @@
 package com.example.snackstore.entity
 
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.Relation
 
 @Entity(
     tableName = "Cart_Items",
@@ -32,3 +34,15 @@ data class CartItem(
     val good_id: Int,
     val quantity: Int = 1
 )
+
+data class CartItemWithGood(
+    @Embedded val cartItem: CartItem,
+    @Relation(
+        parentColumn = "good_id",
+        entityColumn = "id"
+    )
+    val good: Goods
+)
+
+
+
