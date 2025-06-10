@@ -13,7 +13,7 @@ interface OrderedGoodsDao {
     @Query("SELECT * FROM Ordered_Goods WHERE order_id = :orderId")
     suspend fun getOrderedGoodsByOrder(orderId: Int): List<OrderedGoods>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(orderedGoods: OrderedGoods)
 
     @Delete
@@ -24,5 +24,9 @@ interface OrderedGoodsDao {
 
     @Query("SELECT DISTINCT order_id FROM ordered_goods WHERE good_id IN (SELECT good_id FROM ordered_goods)")
     fun getAllOrders(): Flow<List<Int>>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAll(orderedGoods: List<OrderedGoods>)
+
 
 }

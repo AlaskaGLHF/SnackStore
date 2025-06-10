@@ -67,12 +67,8 @@ abstract class SnackStoreDatabase : RoomDatabase() {
         private suspend fun prepopulateDatabase(db: SnackStoreDatabase) {
             val clientsDao = db.clientsDao()
             val goodsDao = db.goodsDao()
-            val favoriteDao = db.favoriteGoodsDao()
             val tagsDao = db.goodsTagsDao()
-            val ordersDao = db.ordersDao()
-            val orderedGoodsDao = db.orderedGoodsDao()
             val deliveryDao = db.deliveryDriverDao()
-            val cartDao = db.cartDao()
 
             val client = Client(1, "Иван", "Иванов", "Иванович", "1990-01-01", "+71234567890", "ivan@example.com", "password123")
             val driver = DeliveryDriver(1, "Петр", "Петров", "Петрович", "+79876543210", "driver@example.com")
@@ -128,7 +124,6 @@ abstract class SnackStoreDatabase : RoomDatabase() {
                 Goods(54, "Сухарики Хрусteam багет сметана-зелень, 100г", "Сухарики", "84", "hrusteamsmet.jpg", 10)
             )
 
-            val favorite = FavoriteGoods(1, 1, 1)
             val tag = listOf(
                 GoodsTags(id = 1, good_id = 1, tag = "Газированный напиток"),
                 GoodsTags(id = 2, good_id = 2, tag = "Газированный напиток"),
@@ -189,11 +184,6 @@ abstract class SnackStoreDatabase : RoomDatabase() {
                 GoodsTags(id = 48, good_id = 54, tag = "Сухарики"),
             )
 
-
-            val order = Order(1, 1, "ул. Пушкина, д. 10", 1, "2025-06-08")
-            val ordered = OrderedGoods(1, 1, 2, 3)
-            val cartItem = CartItem(1, 1, 3, 2)
-
             Log.d("Prepopulate", "Добавление клиента...")
             clientsDao.insertClient(client)
 
@@ -206,20 +196,8 @@ abstract class SnackStoreDatabase : RoomDatabase() {
                 Log.d("Prepopulate", "Добавлен товар: ${good.name}")
             }
 
-            Log.d("Prepopulate", "Добавление избранного...")
-            favoriteDao.insert(favorite)
-
             Log.d("Prepopulate", "Добавление тега...")
             tagsDao.insertAll(tag)
-
-            Log.d("Prepopulate", "Добавление заказа...")
-            ordersDao.insert(order)
-
-            Log.d("Prepopulate", "Добавление заказа-товара...")
-            orderedGoodsDao.insert(ordered)
-
-            Log.d("Prepopulate", "Добавление товара в корзину...")
-            cartDao.addToCart(cartItem)
 
             Log.d("Prepopulate", "Предзаполнение завершено.")
         }

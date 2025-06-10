@@ -25,7 +25,6 @@ class GoodsViewModel(application: Application) : AndroidViewModel(application) {
     private val goodsDao = SnackStoreDatabase.getDatabase(application).goodsDao()
     private val favoriteDao = SnackStoreDatabase.getDatabase(application).favoriteGoodsDao()
     private val goodsTagsDao = SnackStoreDatabase.getDatabase(application).goodsTagsDao()
-//private val cartDao = SnackStoreDatabase.getDatabase(application).cartDao()
     private val sharedPrefs = application.getSharedPreferences("SnackStorePrefs", Context.MODE_PRIVATE)
     private val clientId = sharedPrefs.getLong("client_id", -1L).toInt()
 
@@ -72,15 +71,10 @@ class GoodsViewModel(application: Application) : AndroidViewModel(application) {
         .map { list -> list.map { it.id }.toSet() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
-
-    //private val _selectedTagName = MutableStateFlow<String?>(null)
-   // val selectedTagName: StateFlow<String?> = _selectedTagName
-
     val allTags: StateFlow<List<String>> = goodsTagsDao.getAllTags()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     private val _selectedTag = MutableStateFlow<String?>(null)
-   // val selectedTag: StateFlow<String?> = _selectedTag
 
     fun selectTag(tag: String) {
         Log.d("Prepopulate", "Selected tag: $tag")
@@ -95,16 +89,6 @@ class GoodsViewModel(application: Application) : AndroidViewModel(application) {
             goodsTagsDao.getGoodsByTag(tag)
         }
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
-    fun addToCart(good: Goods) {
-        if (clientId == -1) return
-
-        viewModelScope.launch {
-            Log.d("Cart", "Добавлено в корзину: ${good.name}")
-
-        }
-    }
-
 }
 
 class GoodsViewModelFactory(private val application: Application) : ViewModelProvider.Factory {

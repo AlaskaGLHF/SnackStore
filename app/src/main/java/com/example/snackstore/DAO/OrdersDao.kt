@@ -4,7 +4,6 @@ import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Embedded
 import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Relation
 import androidx.room.Transaction
@@ -18,8 +17,8 @@ interface OrdersDao {
     @Query("SELECT * FROM Orders WHERE client_id = :clientId")
     suspend fun getOrdersByClient(clientId: Int): List<Order>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(order: Order)
+    @Insert
+    suspend fun insert(order: Order): Long
 
     @Delete
     suspend fun delete(order: Order)

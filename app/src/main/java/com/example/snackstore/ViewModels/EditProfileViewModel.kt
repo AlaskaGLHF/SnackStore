@@ -43,11 +43,4 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
             Log.d("Prepopulate", "Клиент обновлён: $client")
         }
     }
-
-    /*private fun getClientIdFromPrefs(context: Context): Long {
-        val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
-        return prefs.getLong("clientId", -1L)
-    }
-
-     */
 }

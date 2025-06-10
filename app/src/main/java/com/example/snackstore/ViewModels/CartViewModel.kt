@@ -2,7 +2,6 @@ package com.example.snackstore.ViewModels
 
 import android.app.Application
 import android.content.Context
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -13,8 +12,10 @@ import com.example.snackstore.entity.CartItemWithGood
 import com.example.snackstore.entity.Goods
 import com.example.snackstore.entity.Order
 import com.example.snackstore.entity.OrderedGoods
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -31,11 +32,8 @@ class CartViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun getClientIdFromPrefs(): Int {
         val prefs = getApplication<Application>().getSharedPreferences("SnackStorePrefs", Context.MODE_PRIVATE)
-        val id = prefs.getLong("client_id", -1L).toInt()
-        Log.d("Prepopulate", "Loaded clientId from prefs: $id")
-        return id
+        return prefs.getLong("client_id", -1L).toInt()
     }
-
 
     private val clientId: Int
         get() = getClientIdFromPrefs()
@@ -44,13 +42,11 @@ class CartViewModel(application: Application) : AndroidViewModel(application) {
         cartDao.getCartItemsWithGoods(clientId)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val _orderCreated = MutableSharedFlow<Long>()
+    val orderCreated = _orderCreated.asSharedFlow()
+
     fun addToCart(good: Goods) {
-        val clientId = getClientIdFromPrefs()
-        Log.d("Prepopulate", "addToCart called for ${good.name}, clientId = $clientId")
-        if (clientId == -1) {
-            Log.e("Prepopulate", "Invalid clientId, cannot add to cart")
-            return
-        }
+        if (clientId == -1) return
         viewModelScope.launch {
             val items = cartDao.getCartItemsForClient(clientId).first()
             val existing = items.find { it.good_id == good.id }
@@ -59,52 +55,48 @@ class CartViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 cartDao.addToCart(CartItem(0, clientId, good.id, 1))
             }
-            Log.d("Prepopulate", "Товар добавлен в корзину: ${good.name}")
         }
     }
 
-    fun clearCart() {
-        viewModelScope.launch {
-            cartDao.clearCartForClient(clientId)
-        }
-    }
-
-    fun confirmOrder() {
+    fun confirmOrder(address: String) {
         viewModelScope.launch {
             val items = cartDao.getCartItemsForClient(clientId).first()
             if (items.isEmpty()) return@launch
 
-            val orderId = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
             val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
             val order = Order(
-                id = orderId,
+                id = 0,
                 client_id = clientId,
-                address = "Молдавская дом 5",
+                address = address,
                 delivery_driver_id = 1,
                 date = date
             )
-            ordersDao.insert(order)
 
-            items.forEach { item ->
-                val good = goodsDao.getGoodById(item.good_id)
-                val price = good?.price?.toIntOrNull() ?: 0
-                orderedDao.insert(
-                    OrderedGoods(
-                        order_id = orderId,
-                        good_id = item.good_id,
-                        full_price = price * item.quantity,
-                        date = date
-                    )
+            val orderId = ordersDao.insert(order)
+
+            val orderedGoodsList = items.mapNotNull { item ->
+                val good = goodsDao.getGoodById(item.good_id) ?: return@mapNotNull null
+                val price = good.price?.toIntOrNull() ?: 0
+                OrderedGoods(
+                    order_id = orderId.toInt(),
+                    good_id = item.good_id,
+                    full_price = price * item.quantity,
+                    date = date
                 )
             }
+
+            orderedGoodsList.forEach { orderedGood ->
+                orderedDao.insert(orderedGood)
+            }
+
             cartDao.clearCartForClient(clientId)
+
+            _orderCreated.emit(orderId)
         }
-        clearCart()
     }
 }
 
-// Factory для создания CartViewModel с передачей Application
 class CartViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(CartViewModel::class.java)) {

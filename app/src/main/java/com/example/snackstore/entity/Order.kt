@@ -29,6 +29,6 @@ data class OrderWithGoodsInfo(
 data class GoodsInfo(
     val goodId: Int,
     val name: String,
-    val imagePath: String, // <--- именно image_path, как в entity
+    val imagePath: String,
     val price: Int
 )

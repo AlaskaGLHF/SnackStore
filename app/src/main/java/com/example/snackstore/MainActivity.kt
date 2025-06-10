@@ -66,6 +66,7 @@ import com.example.snackstore.ViewModels.EditProfileViewModel
 import com.example.snackstore.ViewModels.GoodsViewModel
 import com.example.snackstore.ViewModels.GoodsViewModelFactory
 import com.example.snackstore.ViewModels.OrdersViewModel
+import com.example.snackstore.ViewModels.OrdersViewModelFactory
 import com.example.snackstore.entity.Goods
 
 class MainActivity : ComponentActivity() {
@@ -109,6 +110,7 @@ fun AppNavigation() {
         composable("personal_recommendations") {
             PersonalRecommendationsScreen(navController)
         }
+        composable("splash") { SplashScreen(navController) }
 
     }
 }
@@ -219,6 +221,18 @@ fun LoginScreen(navController: NavHostController) {
             }
         }
     }
+
+    LaunchedEffect(authResult) {
+        if (authResult != null) {
+            Log.d("SnackStore", "Успешная авторизация пользователя: $login")
+            navController.navigate("splash") {
+                popUpTo("login") { inclusive = true }
+            }
+            viewModel.resetState()
+        }
+    }
+
+
 }
 
 @Composable
@@ -373,6 +387,29 @@ fun RegistrationTextField(
         )
     )
 }
+
+@Composable
+fun SplashScreen(navController: NavHostController) {
+    // Показываем просто логотип или индикатор загрузки
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFD6A153)),
+        contentAlignment = Alignment.Center
+    ) {
+        // Можно логотип или CircularProgressIndicator
+        CircularProgressIndicator(color = Color.White)
+    }
+
+    LaunchedEffect(Unit) {
+        delay(5000)
+        navController.navigate("main") {
+            popUpTo("login") { inclusive = true }
+            popUpTo("splash") { inclusive = true }
+        }
+    }
+}
+
 
 @Composable
 fun MainScreen(
@@ -649,8 +686,11 @@ fun ProductsByTagScreen(
                 Text("Товаров в этой категории пока нет", color = accentColor)
             }
         } else {
+            val favoriteIds by goodsViewModel.favoriteGoodsIds.collectAsState()
+
             GoodsGrid(
                 goods = goods,
+                favoriteIds = favoriteIds, // добавлено
                 modifier = Modifier.fillMaxSize(),
                 onItemClick = { /* обработка клика */ },
                 onAddToCart = { good ->
@@ -659,6 +699,7 @@ fun ProductsByTagScreen(
                 },
                 onToggleFavorite = { good -> goodsViewModel.toggleFavorite(good) }
             )
+
         }
     }
 }
@@ -666,7 +707,8 @@ fun ProductsByTagScreen(
 @Composable
 fun GoodsGrid(
     goods: List<Goods>,
-    modifier: Modifier = Modifier,
+    favoriteIds: Set<Int> = emptySet(), // добавлено
+    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier,
     onItemClick: ((Goods) -> Unit)? = null,
     onAddToCart: (Goods) -> Unit = {},
     onToggleFavorite: (Goods) -> Unit = {}
@@ -681,6 +723,7 @@ fun GoodsGrid(
         items(goods) { good ->
             ProductCard(
                 good = good,
+                isLiked = favoriteIds.contains(good.id), // добавлено
                 modifier = Modifier
                     .fillMaxWidth()
                     .wrapContentHeight()
@@ -691,6 +734,7 @@ fun GoodsGrid(
         }
     }
 }
+
 
 @Composable
 fun SearchScreen(
@@ -1189,7 +1233,8 @@ fun EditProfileScreen(
 
 @Composable
 fun FavoriteList(
-    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application))
+    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application)),
+    cartViewModel: CartViewModel = viewModel()
 ) {
     val favorites by goodsViewModel.favoriteGoodsList.collectAsState()
     val favoriteIds by goodsViewModel.favoriteGoodsIds.collectAsState()
@@ -1198,8 +1243,8 @@ fun FavoriteList(
         items(favorites) { good ->
             ProductCard(
                 good = good,
-                isLiked = favoriteIds.contains(good.id), // ✅ используем актуальное состояние
-                onAddToCart = { goodsViewModel.addToCart(it) },
+                isLiked = favoriteIds.contains(good.id),
+                onAddToCart = { cartViewModel.addToCart(it) }, // исправлено
                 onToggleFavorite = { goodsViewModel.toggleFavorite(it) }
             )
         }
@@ -1208,15 +1253,16 @@ fun FavoriteList(
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun OrdersList(viewModel: OrdersViewModel = viewModel()) {
+fun OrdersList() {
+    val context = LocalContext.current
+    val viewModel: OrdersViewModel = viewModel(
+        factory = OrdersViewModelFactory(context.applicationContext as Application)
+    )
+
     val orders by viewModel.ordersWithGoods.collectAsState()
 
     val sortedOrders = remember(orders) {
-        orders.sortedByDescending { order ->
-            runCatching {
-                java.time.LocalDate.parse(order.date)
-            }.getOrElse { java.time.LocalDate.MIN }
-        }
+        orders.sortedByDescending { it.orderId }
     }
 
     LazyColumn(
@@ -1245,7 +1291,9 @@ fun OrdersList(viewModel: OrdersViewModel = viewModel()) {
                         modifier = Modifier.padding(top = 4.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)  // <-- расстояние между фото
+                    ) {
                         items(order.goods) { good ->
                             Image(
                                 painter = painterResource(id = getImageResByName(good.imagePath)),
@@ -1269,6 +1317,9 @@ fun CartScreen(
     navController: NavHostController,
     cartViewModel: CartViewModel = viewModel(
         factory = CartViewModelFactory(LocalContext.current.applicationContext as Application)
+    ),
+    ordersViewModel: OrdersViewModel = viewModel(
+        factory = OrdersViewModelFactory(LocalContext.current.applicationContext as Application)
     )
 ) {
     val cartItems by cartViewModel.cartItems.collectAsState()
@@ -1276,15 +1327,23 @@ fun CartScreen(
 
     var address by remember { mutableStateOf("") }
 
+    // Подписка на событие успешного создания заказа
+    LaunchedEffect(Unit) {
+        cartViewModel.orderCreated.collect { orderId ->
+            Toast.makeText(context, "Заказ #$orderId оформлен успешно", Toast.LENGTH_SHORT).show()
+            ordersViewModel.reloadOrders()
+            address = "" // очистить адрес после заказа
+            navController.popBackStack()
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
     ) {
         TopAppBar(
-            title = {
-                Text("Корзина", color = Color.White)
-            },
+            title = { Text("Корзина", color = Color.White) },
             navigationIcon = {
                 IconButton(onClick = { navController.popBackStack() }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад", tint = Color.White)
@@ -1298,9 +1357,7 @@ fun CartScreen(
                     modifier = Modifier.padding(end = 16.dp)
                 )
             },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color(0xFFD6A153)
-            )
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFD6A153))
         )
 
         OutlinedTextField(
@@ -1353,18 +1410,16 @@ fun CartScreen(
 
         Button(
             onClick = {
-                address = ""
-                cartViewModel.confirmOrder()
-                Toast.makeText(context, "Заказ оформлен", Toast.LENGTH_SHORT).show()
-                navController.popBackStack()
+                cartViewModel.confirmOrder(address)  // Передаем адрес сюда
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            enabled = cartItems.isNotEmpty(),
+            enabled = cartItems.isNotEmpty() && address.isNotBlank(),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD6A153))
         ) {
             Text("Оформить заказ", color = Color.White)
         }
+
     }
 }
