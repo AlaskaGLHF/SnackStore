@@ -49,6 +49,7 @@ import java.util.Calendar
 import java.util.Locale
 import android.app.DatePickerDialog
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -72,6 +73,7 @@ import com.example.snackstore.ViewModels.GoodsViewModelFactory
 import com.example.snackstore.ViewModels.OrdersViewModel
 import com.example.snackstore.ViewModels.OrdersViewModelFactory
 import com.example.snackstore.entity.Goods
+import androidx.core.net.toUri
 
 class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.O)
@@ -483,7 +485,7 @@ fun MainScreen(
 
             item {
                 ProductGrid(
-                    navController = navController, // ✅ добавлено
+                    navController = navController,
                     goodsList = goodsList,
                     favorites = favorites,
                     onToggleFavorite = { goodsViewModel.toggleFavorite(it) },
@@ -533,7 +535,7 @@ fun PersonalRecommendationsScreen(
             ) {
                 item {
                     ProductGrid(
-                        navController = navController, // ✅ добавлено
+                        navController = navController,
                         goodsList = recommendations,
                         favorites = favorites,
                         onToggleFavorite = { goodsViewModel.toggleFavorite(it) },
@@ -548,27 +550,65 @@ fun PersonalRecommendationsScreen(
 
 @Composable
 fun BannerSlider(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+
     val images = listOf(
         R.drawable.banner1,
         R.drawable.banner2,
         R.drawable.banner3
     )
 
+    val urls = listOf(
+        "https://dobrycola-promo.ru/",
+        "https://dobry.ru/tastes/",
+        "https://dobrycola-promo.ru/"
+    )
+
     var currentPage by remember { mutableStateOf(0) }
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(3000L)
+            delay(10_000L)
             currentPage = (currentPage + 1) % images.size
         }
     }
 
-    Image(
-        painter = painterResource(id = images[currentPage]),
-        contentDescription = null,
-        modifier = modifier,
-        contentScale = ContentScale.Crop
-    )
+    Box(modifier = modifier) {
+        Image(
+            painter = painterResource(id = images[currentPage]),
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    val url = urls[currentPage]
+                    if (url.isNotBlank()) {
+                        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+                        context.startActivity(intent)
+                    }
+                },
+            contentScale = ContentScale.Crop
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(80.dp)
+                .align(Alignment.CenterStart)
+                .clickable {
+                    currentPage = if (currentPage - 1 < 0) images.lastIndex else currentPage - 1
+                }
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(80.dp)
+                .align(Alignment.CenterEnd)
+                .clickable {
+                    currentPage = (currentPage + 1) % images.size
+                }
+        )
+    }
 }
 
 @Composable
@@ -745,7 +785,7 @@ fun GoodsGrid(
     goods: List<Goods>,
     favoriteIds: Set<Int> = emptySet(),
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier,
-    onItemClick: ((Goods) -> Unit)? = null, // ✅ должен быть
+    onItemClick: ((Goods) -> Unit)? = null,
     onAddToCart: (Goods) -> Unit = {},
     onToggleFavorite: (Goods) -> Unit = {}
 ) {
@@ -762,7 +802,7 @@ fun GoodsGrid(
                 isLiked = favoriteIds.contains(good.id),
                 onAddToCart = onAddToCart,
                 onToggleFavorite = onToggleFavorite,
-                onClick = { onItemClick?.invoke(good) } // ✅ здесь должен быть onClick
+                onClick = { onItemClick?.invoke(good) }
             )
         }
     }
@@ -861,7 +901,7 @@ fun SearchScreen(
 
 @Composable
 fun ProductGrid(
-    navController: NavController, // ✅ добавлено
+    navController: NavController,
     modifier: Modifier = Modifier,
     goodsList: List<Goods>,
     favorites: Set<Int>,
@@ -881,7 +921,7 @@ fun ProductGrid(
                         modifier = Modifier.weight(1f),
                         onToggleFavorite = onToggleFavorite,
                         onAddToCart = onAddToCart,
-                        onClick = { navController.navigate("productDetail/${good.id}") } // ✅ переход
+                        onClick = { navController.navigate("productDetail/${good.id}") }
                     )
                 }
                 if (rowGoods.size < 2) {
@@ -899,7 +939,7 @@ fun ProductCard(
     isLiked: Boolean = false,
     onAddToCart: (Goods) -> Unit,
     onToggleFavorite: (Goods) -> Unit,
-    onClick: (Goods) -> Unit // 👈 добавлено
+    onClick: (Goods) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -1009,7 +1049,6 @@ fun ProductDetailScreen(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                // Кнопка "Назад"
                 IconButton(
                     onClick = { navController.popBackStack() },
                     modifier = Modifier
@@ -1024,7 +1063,6 @@ fun ProductDetailScreen(
                     )
                 }
 
-                // Иконка избранного
                 Icon(
                     imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (isLiked) "Удалить из избранного" else "Добавить в избранное",
@@ -1122,7 +1160,6 @@ fun ProfileScreen(
     val tabTitles = listOf("Избранное", "Заказы")
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Header
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1386,7 +1423,7 @@ fun EditProfileScreen(
 
 @Composable
 fun FavoriteList(
-    navController: NavController, // 👈 добавлено
+    navController: NavController,
     goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application)),
     cartViewModel: CartViewModel = viewModel()
 ) {
@@ -1449,7 +1486,7 @@ fun OrdersList() {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)  // <-- расстояние между фото
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(order.goods) { good ->
                             Image(
