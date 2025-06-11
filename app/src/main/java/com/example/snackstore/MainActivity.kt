@@ -22,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -54,12 +53,17 @@ import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.style.TextAlign
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigation.NavController
 import com.example.snackstore.ViewModels.CartViewModel
 import com.example.snackstore.ViewModels.CartViewModelFactory
 import com.example.snackstore.ViewModels.EditProfileViewModel
@@ -111,6 +115,16 @@ fun AppNavigation() {
             PersonalRecommendationsScreen(navController)
         }
         composable("splash") { SplashScreen(navController) }
+
+        composable("productDetail/{goodId}") { backStackEntry ->
+            val goodId = backStackEntry.arguments?.getString("goodId")?.toIntOrNull()
+            goodId?.let {
+                ProductDetailScreen(
+                    goodId = it,
+                    navController = navController
+                )
+            }
+        }
 
     }
 }
@@ -196,14 +210,16 @@ fun LoginScreen(navController: NavHostController) {
 
             Button(
                 onClick = {
+                    val emailRegex = Regex("^[\\w.-]+@[\\w.-]+\\.[A-Za-z]{2,}$")
                     if (login.isBlank() || password.isBlank()) {
                         Toast.makeText(context, "Заполните все поля", Toast.LENGTH_SHORT).show()
-                        Log.w("SnackStore", "Попытка входа с пустыми полями")
+                    } else if (!emailRegex.matches(login)) {
+                        Toast.makeText(context, "Некорректный email", Toast.LENGTH_SHORT).show()
                     } else {
-                        Log.d("SnackStore", "Попытка входа: $login")
                         viewModel.login(email = login, password = password)
                     }
-                },
+                }
+                ,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White)
             ) {
@@ -242,6 +258,10 @@ fun RegisterScreen(navController: NavHostController) {
     var email by remember { mutableStateOf("") }
     var birthDate by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+
+    val emailRegex = Regex("^[\\w.-]+@[\\w.-]+\\.[A-Za-z]{2,}$")
+    val phoneRegex = Regex("^\\d{11}$")
+    val passwordRegex = Regex("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{5,}$")
 
     val context = LocalContext.current
     val viewModel: ClientViewModel = viewModel(
@@ -332,9 +352,24 @@ fun RegisterScreen(navController: NavHostController) {
 
             Button(
                 onClick = {
+
                     if (fullName.isBlank() || phone.isBlank() || email.isBlank() || birthDate.isBlank() || password.isBlank()) {
                         Toast.makeText(context, "Пожалуйста, заполните все поля", Toast.LENGTH_SHORT).show()
-                        Log.w("SnackStore", "Попытка регистрации с неполными данными")
+                        return@Button
+                    }
+
+                    if (!emailRegex.matches(email)) {
+                        Toast.makeText(context, "Некорректный email", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+
+                    if (!phoneRegex.matches(phone)) {
+                        Toast.makeText(context, "Телефон должен содержать 11 цифр", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+
+                    if (!passwordRegex.matches(password)) {
+                        Toast.makeText(context, "Пароль должен содержать минимум 5 символов и включать буквы и цифры", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
 
@@ -390,14 +425,12 @@ fun RegistrationTextField(
 
 @Composable
 fun SplashScreen(navController: NavHostController) {
-    // Показываем просто логотип или индикатор загрузки
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFD6A153)),
         contentAlignment = Alignment.Center
     ) {
-        // Можно логотип или CircularProgressIndicator
         CircularProgressIndicator(color = Color.White)
     }
 
@@ -409,7 +442,6 @@ fun SplashScreen(navController: NavHostController) {
         }
     }
 }
-
 
 @Composable
 fun MainScreen(
@@ -451,6 +483,7 @@ fun MainScreen(
 
             item {
                 ProductGrid(
+                    navController = navController, // ✅ добавлено
                     goodsList = goodsList,
                     favorites = favorites,
                     onToggleFavorite = { goodsViewModel.toggleFavorite(it) },
@@ -458,6 +491,7 @@ fun MainScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+
         }
     }
 }
@@ -499,6 +533,7 @@ fun PersonalRecommendationsScreen(
             ) {
                 item {
                     ProductGrid(
+                        navController = navController, // ✅ добавлено
                         goodsList = recommendations,
                         favorites = favorites,
                         onToggleFavorite = { goodsViewModel.toggleFavorite(it) },
@@ -690,16 +725,17 @@ fun ProductsByTagScreen(
 
             GoodsGrid(
                 goods = goods,
-                favoriteIds = favoriteIds, // добавлено
+                favoriteIds = favoriteIds,
                 modifier = Modifier.fillMaxSize(),
-                onItemClick = { /* обработка клика */ },
+                onItemClick = { good ->
+                    navController.navigate("productDetail/${good.id}")
+                },
                 onAddToCart = { good ->
                     cartViewModel.addToCart(good)
                     Toast.makeText(context, "Товар '${good.name}' добавлен в корзину", Toast.LENGTH_SHORT).show()
                 },
                 onToggleFavorite = { good -> goodsViewModel.toggleFavorite(good) }
             )
-
         }
     }
 }
@@ -707,9 +743,9 @@ fun ProductsByTagScreen(
 @Composable
 fun GoodsGrid(
     goods: List<Goods>,
-    favoriteIds: Set<Int> = emptySet(), // добавлено
+    favoriteIds: Set<Int> = emptySet(),
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier,
-    onItemClick: ((Goods) -> Unit)? = null,
+    onItemClick: ((Goods) -> Unit)? = null, // ✅ должен быть
     onAddToCart: (Goods) -> Unit = {},
     onToggleFavorite: (Goods) -> Unit = {}
 ) {
@@ -723,18 +759,14 @@ fun GoodsGrid(
         items(goods) { good ->
             ProductCard(
                 good = good,
-                isLiked = favoriteIds.contains(good.id), // добавлено
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight()
-                    .clickable { onItemClick?.invoke(good) },
+                isLiked = favoriteIds.contains(good.id),
                 onAddToCart = onAddToCart,
-                onToggleFavorite = onToggleFavorite
+                onToggleFavorite = onToggleFavorite,
+                onClick = { onItemClick?.invoke(good) } // ✅ здесь должен быть onClick
             )
         }
     }
 }
-
 
 @Composable
 fun SearchScreen(
@@ -813,7 +845,7 @@ fun SearchScreen(
                         .fillMaxWidth()
                         .padding(vertical = 6.dp)
                         .clickable {
-                            /* TODO: действие по клику на товар */
+                            navController.navigate("productDetail/${good.id}")
                         }
                 ) {
                     Text(
@@ -829,11 +861,12 @@ fun SearchScreen(
 
 @Composable
 fun ProductGrid(
+    navController: NavController, // ✅ добавлено
     modifier: Modifier = Modifier,
     goodsList: List<Goods>,
     favorites: Set<Int>,
     onToggleFavorite: (Goods) -> Unit,
-    onAddToCart: (Goods) -> Unit
+    onAddToCart: (Goods) -> Unit,
 ) {
     Column(modifier = modifier.padding(8.dp)) {
         goodsList.chunked(2).forEach { rowGoods ->
@@ -846,8 +879,9 @@ fun ProductGrid(
                         good = good,
                         isLiked = favorites.contains(good.id),
                         modifier = Modifier.weight(1f),
-                        onToggleFavorite = { onToggleFavorite(it) },
-                        onAddToCart = { onAddToCart(it) }
+                        onToggleFavorite = onToggleFavorite,
+                        onAddToCart = onAddToCart,
+                        onClick = { navController.navigate("productDetail/${good.id}") } // ✅ переход
                     )
                 }
                 if (rowGoods.size < 2) {
@@ -864,7 +898,8 @@ fun ProductCard(
     modifier: Modifier = Modifier,
     isLiked: Boolean = false,
     onAddToCart: (Goods) -> Unit,
-    onToggleFavorite: (Goods) -> Unit
+    onToggleFavorite: (Goods) -> Unit,
+    onClick: (Goods) -> Unit // 👈 добавлено
 ) {
     val context = LocalContext.current
 
@@ -874,6 +909,7 @@ fun ProductCard(
             .background(Color.LightGray, shape = RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
             .border(1.dp, Color.Gray.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+            .clickable { onClick(good) }
             .width(IntrinsicSize.Min)
     ) {
         Box(
@@ -935,6 +971,123 @@ fun ProductCard(
 
             Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+}
+
+@Composable
+fun ProductDetailScreen(
+    goodId: Int,
+    navController: NavHostController,
+    goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application)),
+    cartViewModel: CartViewModel = viewModel(factory = CartViewModelFactory(LocalContext.current.applicationContext as Application))
+) {
+    val context = LocalContext.current
+    val good by produceState<Goods?>(initialValue = null) {
+        value = goodsViewModel.getGoodById(goodId)
+    }
+
+    val favoriteGoodsIds by goodsViewModel.favoriteGoodsIds.collectAsState()
+    val isLiked = good?.id?.let { favoriteGoodsIds.contains(it) } == true
+    val accentColor = Color(0xFFD6A153)
+
+    good?.let {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .background(Color.White)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp)
+            ) {
+                Image(
+                    painter = painterResource(id = getImageResByName(it.image_path)),
+                    contentDescription = it.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // Кнопка "Назад"
+                IconButton(
+                    onClick = { navController.popBackStack() },
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp)
+                        .background(Color.White.copy(alpha = 0.7f), shape = CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Назад",
+                        tint = accentColor
+                    )
+                }
+
+                // Иконка избранного
+                Icon(
+                    imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = if (isLiked) "Удалить из избранного" else "Добавить в избранное",
+                    tint = if (isLiked) Color.Red else Color.Gray,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                        .background(Color.White.copy(alpha = 0.7f), shape = CircleShape)
+                        .size(32.dp)
+                        .clickable {
+                            goodsViewModel.toggleFavorite(it)
+                        }
+                )
+            }
+
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = it.name ?: "Без имени",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "${it.price ?: 0} руб" + if ((it.discount ?: 0) > 0) " (-${it.discount}%)" else "",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.Gray
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = it.description ?: "Описание отсутствует.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.DarkGray,
+                    lineHeight = 20.sp
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = {
+                        cartViewModel.addToCart(it)
+                        Toast.makeText(context, "Товар добавлен в корзину", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = accentColor)
+                ) {
+                    Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Добавить в корзину", color = Color.White)
+                }
+            }
+        }
+    } ?: Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        CircularProgressIndicator(color = Color(0xFFD6A153))
     }
 }
 
@@ -1069,7 +1222,7 @@ fun ProfileScreen(
         }
 
         when (selectedTabIndex) {
-            0 -> FavoriteList()
+            0 -> FavoriteList(navController = navController)
             1 -> OrdersList()
         }
     }
@@ -1233,6 +1386,7 @@ fun EditProfileScreen(
 
 @Composable
 fun FavoriteList(
+    navController: NavController, // 👈 добавлено
     goodsViewModel: GoodsViewModel = viewModel(factory = GoodsViewModelFactory(LocalContext.current.applicationContext as Application)),
     cartViewModel: CartViewModel = viewModel()
 ) {
@@ -1244,8 +1398,11 @@ fun FavoriteList(
             ProductCard(
                 good = good,
                 isLiked = favoriteIds.contains(good.id),
-                onAddToCart = { cartViewModel.addToCart(it) }, // исправлено
-                onToggleFavorite = { goodsViewModel.toggleFavorite(it) }
+                onAddToCart = { cartViewModel.addToCart(it) },
+                onToggleFavorite = { goodsViewModel.toggleFavorite(it) },
+                onClick = { selectedGood ->
+                    navController.navigate("productDetail/${selectedGood.id}")
+                }
             )
         }
     }
@@ -1327,12 +1484,11 @@ fun CartScreen(
 
     var address by remember { mutableStateOf("") }
 
-    // Подписка на событие успешного создания заказа
     LaunchedEffect(Unit) {
         cartViewModel.orderCreated.collect { orderId ->
             Toast.makeText(context, "Заказ #$orderId оформлен успешно", Toast.LENGTH_SHORT).show()
             ordersViewModel.reloadOrders()
-            address = "" // очистить адрес после заказа
+            address = ""
             navController.popBackStack()
         }
     }
@@ -1382,26 +1538,54 @@ fun CartScreen(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F0F0)),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(12.dp)
-                    ) {
-                        val imageRes = getImageResByName(item.good.image_path)
-
-                        Image(
-                            painter = painterResource(id = imageRes),
-                            contentDescription = null,
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .size(64.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                        ) {
+                            val imageRes = getImageResByName(item.good.image_path)
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                            Image(
+                                painter = painterResource(id = imageRes),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
 
-                        Column {
-                            Text(text = item.good.name ?: "Неизвестный товар", style = MaterialTheme.typography.bodyLarge)
-                            Text(text = "Кол-во: ${item.cartItem.quantity}", style = MaterialTheme.typography.bodyMedium)
-                            Text(text = "Цена: ${item.good.price} ₽", style = MaterialTheme.typography.bodyMedium)
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column {
+                                Text(
+                                    text = item.good.name ?: "Неизвестный товар",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    text = "Кол-во: ${item.cartItem.quantity}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = "Цена: ${item.good.price} ₽",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = {
+                                cartViewModel.removeFromCart(item.good.id)
+                            },
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Удалить из корзины",
+                                tint = Color.Red
+                            )
                         }
                     }
                 }
@@ -1410,16 +1594,19 @@ fun CartScreen(
 
         Button(
             onClick = {
-                cartViewModel.confirmOrder(address)  // Передаем адрес сюда
+                if (address.isBlank()) {
+                    Toast.makeText(context, "Введите адрес доставки", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+                cartViewModel.confirmOrder(address)
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            enabled = cartItems.isNotEmpty() && address.isNotBlank(),
+            enabled = cartItems.isNotEmpty(),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD6A153))
         ) {
             Text("Оформить заказ", color = Color.White)
         }
-
     }
 }

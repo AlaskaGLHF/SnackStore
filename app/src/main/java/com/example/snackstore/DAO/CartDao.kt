@@ -49,6 +49,10 @@ interface CartDao {
     @Query("SELECT * FROM Cart_Items WHERE client_id = :clientId")
     fun getCartItemsWithGoods(clientId: Int): Flow<List<CartItemWithGood>>
 
+    @Query("DELETE FROM Cart_Items WHERE good_id = :goodId")
+    suspend fun deleteItemByGoodId(goodId: Int)
+
+
 }
 data class CartItemWithInfo(
     @Embedded val item: CartItem,

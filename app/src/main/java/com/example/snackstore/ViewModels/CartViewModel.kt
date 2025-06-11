@@ -95,6 +95,12 @@ class CartViewModel(application: Application) : AndroidViewModel(application) {
             _orderCreated.emit(orderId)
         }
     }
+
+    fun removeFromCart(goodId: Int) {
+        viewModelScope.launch {
+            cartDao.deleteItemByGoodId(goodId)
+        }
+    }
 }
 
 class CartViewModelFactory(private val application: Application) : ViewModelProvider.Factory {

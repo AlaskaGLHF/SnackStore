@@ -76,6 +76,8 @@ class GoodsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _selectedTag = MutableStateFlow<String?>(null)
 
+    suspend fun getGoodById(id: Int): Goods? = goodsDao.getGoodById(id)
+
     fun selectTag(tag: String) {
         Log.d("Prepopulate", "Selected tag: $tag")
         _selectedTag.value = tag
