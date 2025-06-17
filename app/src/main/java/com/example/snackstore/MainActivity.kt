@@ -1287,7 +1287,7 @@ fun EditProfileScreen(
 
     LaunchedEffect(Unit) {
         delay(100)
-        Log.d("EditProfileScreen", "Пробуем прочитать client после задержки: ${client}")
+        Log.d("EditProfileScreen", "Пробуем прочитать client после задержки: $client")
     }
 
     var fullName by remember { mutableStateOf("") }
